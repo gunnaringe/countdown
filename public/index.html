@@ -1,0 +1,1315 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nedtelling">
+<title>Nedtelling · Countdown</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+  /* Fredoka (SIL OFL, see fonts/OFL.txt), self-hosted so the app works offline.
+     One variable file per script covers every weight. */
+  @font-face {
+    font-family: "Fredoka";
+    font-weight: 300 700;
+    font-display: swap;
+    src: url(/fonts/fredoka-latin-ext.woff2) format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+  @font-face {
+    font-family: "Fredoka";
+    font-weight: 300 700;
+    font-display: swap;
+    src: url(/fonts/fredoka-latin.woff2) format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+
+  :root {
+    --font: "Fredoka", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+    --sheet: #17161f;
+    --sheet-2: #211f2c;
+    --line: rgba(255, 255, 255, 0.08);
+    --text: #f5f3ff;
+    --muted: rgba(245, 243, 255, 0.55);
+    --accent: #ffd23f;
+    --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: var(--font);
+    color: var(--text);
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  /* ---------- Stage ---------- */
+
+  #stage {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    cursor: pointer;
+    transition: background-color 0.35s ease;
+  }
+
+  /* A circle that grows from where you tapped, then hands its color to the stage. */
+  .splash {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    clip-path: circle(0 at var(--x) var(--y));
+    animation: splash 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  @keyframes splash {
+    to { clip-path: circle(150vmax at var(--x) var(--y)); }
+  }
+
+  /* ---------- Timer ---------- */
+
+  /* Taps go through to the stage, except on the preset buttons (not inside #stage). */
+  #main {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(1rem, 4vmin, 2.25rem);
+    padding: 1rem;
+    pointer-events: none;
+    /* Smaller while setting up, so the presets and hint fit below. */
+    --size: min(80vw, calc(100dvh - 15rem), 40rem);
+  }
+  body[data-state="running"] #main,
+  body[data-state="paused"] #main { --size: min(88vw, 86dvh); }
+
+  #ring {
+    position: relative;
+    width: var(--size);
+    height: var(--size);
+    flex: none;
+    transition: width 0.6s var(--ease-pop), height 0.6s var(--ease-pop), opacity 0.4s, transform 0.4s;
+  }
+  #ring svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  #ring circle { fill: none; stroke-width: 26; }
+  #ring .track { stroke: rgba(255, 255, 255, 0.08); }
+  #ring .bar {
+    stroke: var(--c);
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    filter: drop-shadow(0 0 18px color-mix(in srgb, var(--c) 45%, transparent));
+    transition: stroke 0.3s;
+  }
+  #ring.empty .bar { opacity: 0; }
+  /* The last ten seconds: a little heartbeat on every second. */
+  #ring.beat { animation: beat 0.5s var(--ease-pop); }
+  @keyframes beat { 40% { transform: scale(1.04); } }
+  body[data-state="done"] #ring { opacity: 0; transform: scale(0.6); }
+
+  #time {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-weight: 600;
+    font-size: calc(var(--size) * 0.2);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    color: rgba(255, 255, 255, 0.92);
+    transition: opacity 0.3s;
+  }
+  #time.hide { opacity: 0; }
+  body[data-state="paused"] #time { animation: blink 1.6s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+
+  /* Preset durations, only while setting up. */
+  #presets {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.7rem;
+    transition: opacity 0.3s, transform 0.4s var(--ease-pop);
+  }
+  body:not([data-state="idle"]) #presets { opacity: 0; transform: scale(0.8); visibility: hidden; }
+  #presets button {
+    pointer-events: auto;
+    width: 3.6rem;
+    height: 3.6rem;
+    border: 0;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 1.35rem;
+    font-weight: 600;
+    transition: transform 0.25s var(--ease-pop), background 0.2s, color 0.2s;
+  }
+  #presets button small { font-size: 0.7rem; font-weight: 500; opacity: 0.6; margin-top: 0.1rem; }
+  #presets button:hover { background: rgba(255, 255, 255, 0.18); transform: scale(1.1); }
+  #presets button:active { transform: scale(0.9); }
+  #presets button[aria-pressed="true"] { background: var(--c); color: var(--ink); }
+
+  #hint {
+    margin: 0;
+    min-height: 1.5em;
+    font-size: clamp(1.1rem, 3.2vmin, 1.6rem);
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+    padding: 0 2rem;
+    transition: opacity 0.3s;
+  }
+  body[data-state="running"] #hint { opacity: 0; }
+  body.light #hint { color: rgba(0, 0, 0, 0.55); }
+  body.light #hint kbd { border-color: rgba(0, 0, 0, 0.3); }
+  #hint kbd {
+    font-family: inherit;
+    padding: 0.1em 0.7em;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+  }
+
+  /* While running the hint is hidden, so the ring can take its space. */
+  body[data-state="running"] #hint,
+  body[data-state="running"] #presets,
+  body[data-state="paused"] #presets { position: absolute; }
+  body[data-state="paused"] #hint { position: absolute; bottom: max(1.5rem, env(safe-area-inset-bottom)); }
+
+  /* ---------- Done ---------- */
+
+  #done {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    font-weight: 700;
+    font-size: clamp(3rem, 18vmin, 13rem);
+    letter-spacing: 0.02em;
+    text-align: center;
+    padding: 0 1rem;
+    opacity: 0;
+  }
+  #done.show { animation: pop 0.5s var(--ease-pop) forwards, wiggle 2.4s ease-in-out 0.6s infinite; }
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.6) rotate(-4deg); }
+    to   { opacity: 1; transform: scale(1) rotate(0); }
+  }
+  @keyframes wiggle {
+    0%, 100% { opacity: 1; transform: rotate(0) scale(1); }
+    25% { opacity: 1; transform: rotate(-3deg) scale(1.04); }
+    75% { opacity: 1; transform: rotate(3deg) scale(1.04); }
+  }
+
+  /* A burst of little circles when time is up. */
+  .confetti {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: var(--s);
+    height: var(--s);
+    margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+    border-radius: 50%;
+    background: var(--c);
+    pointer-events: none;
+    animation: burst 1.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  @keyframes burst {
+    0% { transform: translate(0, 0) scale(0.2); opacity: 1; }
+    70% { opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0; }
+  }
+
+  /* ---------- Floating buttons ---------- */
+
+  #controls {
+    position: fixed;
+    top: max(1rem, env(safe-area-inset-top));
+    right: max(1rem, env(safe-area-inset-right));
+    display: flex;
+    gap: 0.6rem;
+    transition: opacity 0.6s;
+    z-index: 5;
+  }
+  #controls.idle { opacity: 0.2; }
+  #controls.idle:hover { opacity: 1; }
+
+  .fab {
+    width: 3.25rem;
+    height: 3.25rem;
+    border: 0;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: transform 0.25s var(--ease-pop), background 0.2s;
+  }
+  .fab[hidden] { display: none; }
+  .fab:hover { background: rgba(255, 255, 255, 0.24); transform: scale(1.08); }
+  .fab:active { transform: scale(0.92); }
+  .fab svg { width: 1.5rem; height: 1.5rem; }
+  #gear svg { transition: transform 0.6s var(--ease-pop); }
+  #gear:hover svg { transform: rotate(60deg); }
+  #restart svg { transition: transform 0.6s var(--ease-pop); }
+  #restart:hover svg { transform: rotate(-120deg); }
+  body.light .fab { background: rgba(0, 0, 0, 0.12); color: #111; }
+  body.light .fab:hover { background: rgba(0, 0, 0, 0.2); }
+
+  /* ---------- Settings sheet ---------- */
+
+  #scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s, visibility 0.25s;
+  }
+  #scrim.open { opacity: 1; visibility: visible; }
+
+  #sheet {
+    width: min(100%, 30rem);
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    background: linear-gradient(160deg, var(--sheet-2), var(--sheet) 60%);
+    border-radius: 2.25rem;
+    padding: 1.5rem 1.5rem 1.75rem;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transform: translateY(1.5rem) scale(0.94);
+    transition: transform 0.4s var(--ease-pop);
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  #sheet::-webkit-scrollbar { display: none; }
+  #scrim.open #sheet { transform: none; }
+
+  .sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+  .sheet-head h2 {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .sheet-head h2 .blob {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    background: conic-gradient(var(--c) 0 75%, rgba(255, 255, 255, 0.15) 0);
+  }
+
+  .round {
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: none;
+    border: 0;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.08);
+    transition: transform 0.2s var(--ease-pop), background 0.2s, opacity 0.2s;
+  }
+  .round:hover { background: rgba(255, 255, 255, 0.16); transform: scale(1.08); }
+  .round:active { transform: scale(0.9); }
+  .round:disabled { opacity: 0.25; pointer-events: none; }
+  .round svg { width: 1.1rem; height: 1.1rem; }
+
+  section { margin-top: 1.6rem; }
+  section h3 {
+    margin: 0 0 0.7rem 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* Color palette */
+  .palette {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.6rem;
+    justify-items: center;
+    padding: 0.9rem 0.6rem;
+    border-radius: 1.75rem;
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .palette button {
+    width: 2.6rem;
+    height: 2.6rem;
+    border: 0;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    display: grid;
+    place-items: center;
+    color: var(--ink);
+    transition: transform 0.25s var(--ease-pop), box-shadow 0.2s;
+  }
+  .palette button:hover { transform: scale(1.15); }
+  .palette button:active { transform: scale(0.9); }
+  .palette button svg { width: 1.2rem; height: 1.2rem; opacity: 0; transform: scale(0.4); transition: 0.3s var(--ease-pop); }
+  .palette button[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--sheet-2), 0 0 0 5.5px var(--c); }
+  .palette button[aria-pressed="true"] svg { opacity: 1; transform: none; }
+
+  /* Setting rows */
+  .card {
+    border-radius: 1.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.35rem 1.1rem;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 3.4rem;
+  }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row label.text { flex: 1; font-size: 1.05rem; cursor: pointer; }
+  .row .text { font-size: 1.05rem; }
+
+  /* Pill toggle switch */
+  .switch { position: relative; width: 3.4rem; height: 2rem; flex: none; }
+  .switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .switch .track {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    transition: background 0.25s;
+  }
+  .switch .track::after {
+    content: "";
+    position: absolute;
+    top: 0.2rem;
+    left: 0.2rem;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transition: transform 0.35s var(--ease-pop);
+  }
+  .switch input:checked + .track { background: #34c759; }
+  .switch input:checked + .track::after { transform: translateX(1.4rem); }
+  .switch input:focus-visible + .track { box-shadow: 0 0 0 3px var(--accent); }
+
+  /* Segmented pill */
+  .segmented {
+    position: relative;
+    display: inline-flex;
+    padding: 0.25rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .segmented button {
+    position: relative;
+    z-index: 1;
+    border: 0;
+    background: transparent;
+    padding: 0.45rem 0.95rem;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--muted);
+    transition: color 0.25s;
+    white-space: nowrap;
+  }
+  .segmented button[aria-pressed="true"] { color: #17161f; }
+  .segmented .thumb {
+    position: absolute;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    border-radius: 999px;
+    background: var(--accent);
+    transition: left 0.35s var(--ease-pop), width 0.35s var(--ease-pop);
+  }
+
+  /* Steppers */
+  .stepper { display: flex; align-items: center; gap: 0.5rem; }
+  .stepper output {
+    min-width: 3.2rem;
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Confirm dialog */
+  #confirm {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+  }
+  /* Visible at once when opening, so the Cancel button can take focus. */
+  #confirm.open { opacity: 1; visibility: visible; transition: opacity 0.2s, visibility 0s; }
+  #confirm .card {
+    width: min(100%, 21rem);
+    padding: 1.75rem 1.5rem 1.5rem;
+    border-radius: 2.25rem;
+    background: linear-gradient(160deg, #2a2836, #1d1c27 70%);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    text-align: center;
+    transform: scale(0.85);
+    transition: transform 0.4s var(--ease-pop);
+  }
+  #confirm.open .card { transform: none; }
+  #confirm .badge {
+    width: 3.75rem;
+    height: 3.75rem;
+    margin: 0 auto 1rem;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: #ff9dbb;
+    background: rgba(255, 93, 143, 0.16);
+  }
+  #confirm .badge svg { width: 1.75rem; height: 1.75rem; }
+  #confirm.open .badge svg { animation: spin-back 0.7s var(--ease-pop) 0.1s; }
+  @keyframes spin-back { from { transform: rotate(160deg); } }
+  #confirm h4 { margin: 0; font-size: 1.35rem; font-weight: 600; }
+  #confirm p { margin: 0.5rem 0 1.5rem; color: var(--muted); line-height: 1.4; }
+  #confirm .actions { display: flex; gap: 0.6rem; }
+  #confirm .actions button { flex: 1; padding: 0.8rem 1rem; }
+  .pill.danger { background: #ff5d8f; color: #fff; }
+
+  #install[hidden], .install-hint[hidden] { display: none; }
+  .install-hint {
+    margin: 1rem auto 0;
+    max-width: 22rem;
+    text-align: center;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  .install-hint svg { width: 1em; height: 1em; vertical-align: -0.12em; }
+  /* Already fullscreen as an installed app. */
+  @media (display-mode: fullscreen) { #fullscreen { display: none; } }
+
+  .footer { margin-top: 1.8rem; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; }
+  .repo {
+    display: flex;
+    width: fit-content;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 1.1rem auto 0;
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-decoration: none;
+    opacity: 0.7;
+    transition: opacity 0.2s, background 0.2s, transform 0.2s var(--ease-pop);
+  }
+  .repo:hover { opacity: 1; background: rgba(255, 255, 255, 0.06); }
+  .repo:active { transform: scale(0.95); }
+  .repo:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .repo svg { width: 1rem; height: 1rem; }
+  .pill {
+    border: 0;
+    padding: 0.7rem 1.4rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #17161f;
+    font-weight: 600;
+    transition: transform 0.25s var(--ease-pop), filter 0.2s;
+  }
+  .pill:hover { transform: scale(1.05); filter: brightness(1.08); }
+  .pill:active { transform: scale(0.95); }
+  .ghost {
+    border: 0;
+    padding: 0.7rem 1.4rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--muted);
+    font-weight: 500;
+    transition: background 0.2s, color 0.2s, transform 0.2s var(--ease-pop);
+  }
+  .ghost:hover { background: rgba(255, 93, 143, 0.18); color: #ff9dbb; }
+  .ghost:active { transform: scale(0.95); }
+
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body data-state="idle">
+
+<div id="stage" aria-live="polite"></div>
+
+<div id="main">
+  <div id="ring">
+    <svg viewBox="0 0 200 200" aria-hidden="true">
+      <circle class="track" cx="100" cy="100" r="86"/>
+      <circle class="bar" cx="100" cy="100" r="86"/>
+    </svg>
+    <div id="time" role="timer"></div>
+  </div>
+  <div id="presets"></div>
+  <p id="hint"></p>
+</div>
+
+<div id="done" data-i18n="done"></div>
+
+<div id="controls">
+  <button class="fab" id="restart" data-i18n-title="restart" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4v4.5H8"/></svg>
+  </button>
+  <button class="fab" id="fullscreen" data-i18n-title="fullscreen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path class="enter" d="M4 9V6a2 2 0 0 1 2-2h3M15 4h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M9 20H6a2 2 0 0 1-2-2v-3"/><path class="exit" style="display:none" d="M9 4v3a2 2 0 0 1-2 2H4M20 9h-3a2 2 0 0 1-2-2V4M15 20v-3a2 2 0 0 1 2-2h3M4 15h3a2 2 0 0 1 2 2v3"/></svg>
+  </button>
+  <button class="fab" id="gear" data-i18n-title="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</div>
+
+<div id="scrim">
+  <div id="sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="sheet-head">
+      <h2 id="settings-title"><span class="blob"></span><span data-i18n="settings"></span></h2>
+      <button class="round" id="close" data-i18n-title="close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+
+    <section>
+      <h3 data-i18n="time"></h3>
+      <div class="card">
+        <div class="row">
+          <span class="text" data-i18n="minutes"></span>
+          <div class="stepper">
+            <button class="round" id="min-down" aria-label="−"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
+            <output id="min"></output>
+            <button class="round" id="min-up" aria-label="+"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
+          </div>
+        </div>
+        <div class="row">
+          <span class="text" data-i18n="seconds"></span>
+          <div class="stepper">
+            <button class="round" id="sec-down" aria-label="−"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
+            <output id="sec"></output>
+            <button class="round" id="sec-up" aria-label="+"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h3 data-i18n="color"></h3>
+      <div class="palette"></div>
+    </section>
+
+    <section>
+      <h3 data-i18n="options"></h3>
+      <div class="card">
+        <div class="row">
+          <label class="text" for="sound" data-i18n="sound"></label>
+          <span class="switch"><input type="checkbox" id="sound"><span class="track"></span></span>
+        </div>
+        <div class="row">
+          <label class="text" for="show-time" data-i18n="showTime"></label>
+          <span class="switch"><input type="checkbox" id="show-time"><span class="track"></span></span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h3 data-i18n="language"></h3>
+      <div class="segmented" id="lang">
+        <span class="thumb"></span>
+        <button data-value="auto">Auto</button>
+        <button data-value="no">Norsk</button>
+        <button data-value="en">English</button>
+      </div>
+    </section>
+
+    <div class="footer">
+      <button class="pill" id="install" data-i18n="install" hidden></button>
+      <button class="ghost" id="reset" data-i18n="reset"></button>
+    </div>
+    <p class="install-hint" id="ios-install" hidden></p>
+
+    <a class="repo" href="https://github.com/gunnaringe/countdown" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+      github.com/gunnaringe/countdown
+    </a>
+  </div>
+</div>
+
+<div id="confirm">
+  <div class="card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+    <div class="badge"></div>
+    <h4 id="confirm-title"></h4>
+    <p id="confirm-text"></p>
+    <div class="actions">
+      <button class="ghost" id="confirm-no"></button>
+      <button class="pill danger" id="confirm-yes"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const STORAGE_KEY = "countdown-settings-v1";
+
+  const I18N = {
+    no: {
+      appName: "Nedtelling",
+      hintStart: "Trykk <kbd>mellomrom</kbd> eller på skjermen for å starte",
+      hintPaused: "Pause – trykk for å fortsette",
+      hintDone: "Trykk for å starte på nytt",
+      done: "Ferdig!",
+      min: "min",
+      restart: "Start på nytt",
+      settings: "Innstillinger",
+      fullscreen: "Fullskjerm",
+      close: "Lukk",
+      time: "Tid",
+      minutes: "Minutter",
+      seconds: "Sekunder",
+      color: "Farge",
+      options: "Valg",
+      sound: "Spill en lyd når tiden er ute",
+      showTime: "Vis tallene",
+      language: "Språk",
+      reset: "Tilbakestill alt",
+      confirmReset: "Tilbakestille alt?",
+      confirmResetText: "Tid, farge og alle innstillinger går tilbake til standard.",
+      cancel: "Avbryt",
+      install: "Installer appen",
+      iosInstall: "Installer som app: trykk {share} Del og velg «Legg til på Hjem-skjerm».",
+      red: "Rød", orange: "Oransje", yellow: "Gul", lime: "Limegrønn", green: "Grønn",
+      turquoise: "Turkis", lightblue: "Lyseblå", blue: "Blå", purple: "Lilla", pink: "Rosa",
+    },
+    en: {
+      appName: "Countdown",
+      hintStart: "Press <kbd>space</kbd> or tap the screen to start",
+      hintPaused: "Paused – tap to continue",
+      hintDone: "Tap to start over",
+      done: "Time's up!",
+      min: "min",
+      restart: "Start over",
+      settings: "Settings",
+      fullscreen: "Fullscreen",
+      close: "Close",
+      time: "Time",
+      minutes: "Minutes",
+      seconds: "Seconds",
+      color: "Color",
+      options: "Options",
+      sound: "Play a sound when time is up",
+      showTime: "Show the numbers",
+      language: "Language",
+      reset: "Reset everything",
+      confirmReset: "Reset everything?",
+      confirmResetText: "Time, color and all settings go back to the defaults.",
+      cancel: "Cancel",
+      install: "Install app",
+      iosInstall: "Install as an app: tap {share} Share, then “Add to Home Screen”.",
+      red: "Red", orange: "Orange", yellow: "Yellow", lime: "Lime", green: "Green",
+      turquoise: "Turquoise", lightblue: "Light blue", blue: "Blue", purple: "Purple", pink: "Pink",
+    },
+  };
+
+  // Same named colors as color.apphub.casa, minus the ones a ring vanishes in.
+  const PRESETS = {
+    red: "#ff3b30", orange: "#ff8a00", yellow: "#ffd23f", lime: "#a3e635", green: "#34c759",
+    turquoise: "#14b8a6", lightblue: "#5ac8fa", blue: "#3a86ff", purple: "#a855f7", pink: "#ff5d8f",
+  };
+
+  // Quick picks under the ring, in minutes.
+  const QUICK = [1, 2, 3, 5, 10, 15];
+  const MAX_SECONDS = 99 * 60 + 55;
+  const MIN_SECONDS = 5;
+
+  const defaults = () => ({
+    lang: "auto",
+    seconds: 5 * 60,
+    hex: PRESETS.yellow,
+    sound: true,
+    showTime: true,
+  });
+
+  const load = () => {
+    const d = defaults();
+    try {
+      const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      return s ? { ...d, ...s } : d;
+    } catch {
+      return d;
+    }
+  };
+
+  let settings = load();
+  const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+
+  const $ = (sel) => document.querySelector(sel);
+  const stage = $("#stage");
+  const ring = $("#ring");
+  const bar = ring.querySelector(".bar");
+  const timeEl = $("#time");
+  const hint = $("#hint");
+  const doneEl = $("#done");
+  const controls = $("#controls");
+  const scrim = $("#scrim");
+
+  // ---------- i18n ----------
+
+  const browserLang = () =>
+    (navigator.languages || [navigator.language]).some((l) => /^(no|nb|nn)\b/i.test(l)) ? "no" : "en";
+  const lang = () => (settings.lang === "auto" ? browserLang() : settings.lang);
+  const t = (k) => I18N[lang()][k] ?? I18N.en[k] ?? k;
+
+  const applyI18n = () => {
+    document.documentElement.lang = lang();
+    document.querySelectorAll("[data-i18n]").forEach((el) => (el.textContent = t(el.dataset.i18n)));
+    document.querySelectorAll("[data-i18n-html]").forEach((el) => (el.innerHTML = t(el.dataset.i18nHtml)));
+    document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+      el.title = t(el.dataset.i18nTitle);
+      el.setAttribute("aria-label", el.title);
+    });
+  };
+
+  // ---------- Color helpers ----------
+
+  const isLight = (hex) => {
+    const n = parseInt(hex.slice(1), 16);
+    const [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255].map((v) => {
+      v /= 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.35;
+  };
+
+  const paint = (hex, x, y) => {
+    const splash = document.createElement("div");
+    splash.className = "splash";
+    splash.style.background = hex;
+    splash.style.setProperty("--x", `${x ?? innerWidth / 2}px`);
+    splash.style.setProperty("--y", `${y ?? innerHeight / 2}px`);
+    stage.after(splash);
+    splash.addEventListener("animationend", () => {
+      stage.style.transition = "none";
+      stage.style.backgroundColor = hex;
+      stage.offsetWidth;
+      stage.style.transition = "";
+      splash.remove();
+    });
+    document.body.classList.toggle("light", isLight(hex));
+    document.querySelector('meta[name="theme-color"]').content = hex;
+  };
+
+  // ---------- Timer ----------
+  //
+  // "idle" → set up, not started; "running"; "paused"; "done" → time is up.
+  // Time left is always worked out from `endAt`, never counted down, so a
+  // throttled background tab can't make the timer drift. requestAnimationFrame
+  // only draws; finishing has its own timeout, which runs in the background too.
+
+  let state = "idle";
+  let total = settings.seconds * 1000;
+  let left = total;   // ms left, while idle or paused
+  let endAt = 0;      // Date.now() when time is up, while running
+  let doneTimer = null;
+  let frame = null;
+  let shownSecond = null;
+
+  const C = 2 * Math.PI * 86;
+
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+  const remaining = () => (state === "running" ? Math.max(0, endAt - Date.now()) : left);
+
+  const draw = () => {
+    const ms = remaining();
+    const p = total ? ms / total : 0;
+    // The colored arc runs from its edge clockwise up to twelve o'clock, and
+    // the edge sweeps clockwise like a clock hand eating it up.
+    bar.style.strokeDasharray = `${C * p} ${C}`;
+    bar.style.strokeDashoffset = `${-C * (1 - p)}`;
+    ring.classList.toggle("empty", ms <= 0);
+    const s = Math.ceil(ms / 1000);
+    if (s !== shownSecond) {
+      shownSecond = s;
+      timeEl.textContent = fmt(s);
+      if (state === "running" && s <= 10 && s > 0) {
+        ring.classList.remove("beat");
+        ring.offsetWidth; // restart the beat
+        ring.classList.add("beat");
+      }
+      renderTitle();
+    }
+  };
+
+  const loop = () => {
+    draw();
+    if (state === "running") {
+      if (remaining() <= 0) finish();
+      else frame = requestAnimationFrame(loop);
+    }
+  };
+
+  const setState = (s) => {
+    state = s;
+    document.body.dataset.state = s;
+    $("#restart").hidden = s === "idle";
+    hint.innerHTML = t({ idle: "hintStart", running: "hintStart", paused: "hintPaused", done: "hintDone" }[s]);
+    renderTitle();
+  };
+
+  const start = () => {
+    unlockAudio();
+    keepAwake();
+    endAt = Date.now() + left;
+    setState("running");
+    clearTimeout(doneTimer);
+    doneTimer = setTimeout(finish, left + 20);
+    cancelAnimationFrame(frame);
+    loop();
+  };
+
+  const pause = () => {
+    left = remaining();
+    clearTimeout(doneTimer);
+    cancelAnimationFrame(frame);
+    setState("paused");
+    draw();
+  };
+
+  const finish = () => {
+    if (state !== "running" || remaining() > 0) return;
+    clearTimeout(doneTimer);
+    cancelAnimationFrame(frame);
+    left = 0;
+    setState("done");
+    draw();
+    paint(settings.hex);
+    doneEl.style.color = isLight(settings.hex) ? "rgba(0,0,0,0.78)" : "rgba(255,255,255,0.92)";
+    doneEl.classList.remove("show");
+    doneEl.offsetWidth; // restart the pop animation
+    doneEl.classList.add("show");
+    celebrate();
+    chime();
+  };
+
+  const reset = (x, y) => {
+    clearTimeout(doneTimer);
+    cancelAnimationFrame(frame);
+    const wasDone = state === "done";
+    total = left = settings.seconds * 1000;
+    doneEl.classList.remove("show");
+    setState("idle");
+    draw();
+    if (wasDone) paint("#000000", x, y);
+  };
+
+  const celebrate = () => {
+    const colors = Object.values(PRESETS);
+    const spread = Math.max(innerWidth, innerHeight) * 0.6;
+    for (let i = 0; i < 36; i++) {
+      const dot = document.createElement("span");
+      dot.className = "confetti";
+      const a = Math.random() * Math.PI * 2;
+      const d = spread * (0.35 + Math.random() * 0.65);
+      dot.style.setProperty("--dx", `${Math.cos(a) * d}px`);
+      dot.style.setProperty("--dy", `${Math.sin(a) * d}px`);
+      dot.style.setProperty("--s", `${0.8 + Math.random() * 1.8}rem`);
+      // Skip the background's own color, it would be invisible.
+      dot.style.setProperty("--c", colors.filter((c) => c !== settings.hex)[i % (colors.length - 1)]);
+      dot.style.animationDelay = `${Math.random() * 0.15}s`;
+      dot.addEventListener("animationend", () => dot.remove());
+      document.body.append(dot);
+    }
+  };
+
+  const advance = (x, y) => {
+    if (scrim.classList.contains("open")) return;
+    if (state === "idle" || state === "paused") start();
+    else if (state === "running") pause();
+    else reset(x, y);
+  };
+
+  stage.addEventListener("click", (e) => advance(e.clientX, e.clientY));
+
+  $("#restart").addEventListener("click", () => reset());
+
+  document.addEventListener("keydown", (e) => {
+    if (scrim.classList.contains("open")) {
+      if (e.key === "Escape") closeSettings();
+      return;
+    }
+    // Leave shortcuts like Ctrl/Cmd+R (reload) to the browser.
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      if (!e.repeat) advance();
+    } else if ((e.key === "Escape" || e.key === "Backspace" || e.key.toLowerCase() === "r") && state !== "idle") {
+      e.preventDefault();
+      reset();
+    }
+  });
+
+  // Coming back to a tab whose time ran out while it was hidden.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (state === "running") loop();
+    if (state === "running" || state === "paused") keepAwake();
+  });
+
+  // ---------- Sound ----------
+  //
+  // Browsers (iOS especially) only let audio start from a tap or key press,
+  // so the context is created or resumed when the timer is started — by the
+  // time it rings, nobody is touching the screen.
+
+  let audio = null;
+  const unlockAudio = () => {
+    if (!settings.sound) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audio ??= new AC();
+    if (audio.state === "suspended") audio.resume();
+  };
+
+  const chime = () => {
+    if (!settings.sound || !audio) return;
+    // iOS may have suspended it during a long timer.
+    if (audio.state !== "running") audio.resume();
+    const t0 = audio.currentTime + 0.05;
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    [0, 0.9].forEach((offset) => notes.forEach((f, i) => {
+      const at = t0 + offset + i * 0.13;
+      const osc = audio.createOscillator();
+      const gain = audio.createGain();
+      osc.type = "sine";
+      osc.frequency.value = f;
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(0.28, at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, at + 0.8);
+      osc.connect(gain).connect(audio.destination);
+      osc.start(at);
+      osc.stop(at + 0.85);
+    }));
+  };
+
+  // ---------- Idle controls ----------
+
+  let idleTimer;
+  const wake = () => {
+    controls.classList.remove("idle");
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => controls.classList.add("idle"), 3000);
+  };
+  ["mousemove", "pointerdown"].forEach((ev) => document.addEventListener(ev, wake, { passive: true }));
+  wake();
+
+  // ---------- Fullscreen & wake lock ----------
+
+  const fsBtn = $("#fullscreen");
+  if (!document.documentElement.requestFullscreen) fsBtn.hidden = true;
+  fsBtn.addEventListener("click", () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen().catch(() => {});
+  });
+  document.addEventListener("fullscreenchange", () => {
+    const on = !!document.fullscreenElement;
+    fsBtn.querySelector(".enter").style.display = on ? "none" : "";
+    fsBtn.querySelector(".exit").style.display = on ? "" : "none";
+  });
+
+  let wakeLock = null;
+  const keepAwake = async () => {
+    if (wakeLock || !navigator.wakeLock) return;
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => (wakeLock = null));
+    } catch {}
+  };
+
+  // ---------- Presets & settings ----------
+
+  // Changing the time while a timer is going leaves it alone; it's used next time.
+  const setSeconds = (s) => {
+    settings.seconds = Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, s));
+    save();
+    if (state === "idle") reset();
+    renderPresets();
+    renderOptions();
+  };
+
+  const presetsEl = $("#presets");
+  for (const m of QUICK) {
+    const b = document.createElement("button");
+    b.dataset.seconds = m * 60;
+    b.innerHTML = `${m}<small data-i18n="min"></small>`;
+    b.addEventListener("click", () => setSeconds(m * 60));
+    presetsEl.append(b);
+  }
+  const renderPresets = () => {
+    presetsEl.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.seconds === settings.seconds));
+  };
+
+  const check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const palette = $(".palette");
+  for (const [key, hex] of Object.entries(PRESETS)) {
+    const b = document.createElement("button");
+    b.dataset.hex = hex;
+    b.dataset.key = key;
+    b.style.setProperty("--c", hex);
+    b.style.setProperty("--ink", isLight(hex) ? "#000" : "#fff");
+    b.innerHTML = check;
+    b.addEventListener("click", () => {
+      settings.hex = hex;
+      save();
+      renderColor();
+    });
+    palette.append(b);
+  }
+
+  const renderColor = () => {
+    document.body.style.setProperty("--c", settings.hex);
+    document.body.style.setProperty("--ink", isLight(settings.hex) ? "#17161f" : "#fff");
+    palette.querySelectorAll("button").forEach((b) => {
+      b.setAttribute("aria-pressed", b.dataset.hex === settings.hex);
+      b.title = t(b.dataset.key);
+      b.setAttribute("aria-label", b.title);
+    });
+  };
+
+  const setSegmented = (el, value) => {
+    const thumb = el.querySelector(".thumb");
+    el.querySelectorAll("button").forEach((b) => {
+      const on = b.dataset.value === value;
+      b.setAttribute("aria-pressed", on);
+      if (on) {
+        thumb.style.left = `${b.offsetLeft}px`;
+        thumb.style.width = `${b.offsetWidth}px`;
+      }
+    });
+  };
+
+  const renderOptions = () => {
+    const m = Math.floor(settings.seconds / 60), s = settings.seconds % 60;
+    $("#min").textContent = m;
+    $("#sec").textContent = String(s).padStart(2, "0");
+    $("#min-down").disabled = m === 0;
+    $("#min-up").disabled = m >= 99;
+    $("#sec-down").disabled = s === 0 || settings.seconds - 5 < MIN_SECONDS;
+    $("#sec-up").disabled = s >= 55;
+    $("#sound").checked = settings.sound;
+    $("#show-time").checked = settings.showTime;
+    timeEl.classList.toggle("hide", !settings.showTime);
+    // Segmented thumbs measure their buttons, so they need the sheet laid out.
+    requestAnimationFrame(() => setSegmented($("#lang"), settings.lang));
+  };
+
+  const renderTitle = () => {
+    document.title = state === "running" || state === "paused"
+      ? `${fmt(shownSecond ?? 0)} · ${t("appName")}`
+      : "Nedtelling · Countdown";
+  };
+
+  const renderAll = () => {
+    applyI18n();
+    setState(state);
+    renderPresets();
+    renderColor();
+    renderOptions();
+    renderInstallHint();
+  };
+
+  const openSettings = () => {
+    scrim.classList.add("open");
+    renderAll();
+  };
+
+  const closeSettings = () => {
+    scrim.classList.remove("open");
+    $("#gear").focus({ preventScroll: true });
+  };
+
+  $("#gear").addEventListener("click", openSettings);
+  $("#close").addEventListener("click", closeSettings);
+  scrim.addEventListener("click", (e) => { if (e.target === scrim) closeSettings(); });
+
+  $("#min-down").addEventListener("click", () => setSeconds(settings.seconds - 60));
+  $("#min-up").addEventListener("click", () => setSeconds(settings.seconds + 60));
+  $("#sec-down").addEventListener("click", () => setSeconds(settings.seconds - 5));
+  $("#sec-up").addEventListener("click", () => setSeconds(settings.seconds + 5));
+
+  $("#sound").addEventListener("change", (e) => {
+    settings.sound = e.target.checked;
+    save();
+    // A little preview, which also unlocks audio from this tap.
+    if (settings.sound) {
+      unlockAudio();
+      chime();
+    }
+  });
+  $("#show-time").addEventListener("change", (e) => { settings.showTime = e.target.checked; save(); renderOptions(); });
+
+  $("#lang").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    settings.lang = b.dataset.value;
+    save();
+    renderAll();
+  });
+
+  // ---------- Dialog ----------
+
+  const confirmEl = $("#confirm");
+  const RESET_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4v4.5H8"/></svg>';
+
+  // Resolves true (yes) or false (no / Escape / backdrop). Focus starts on
+  // "no", so an accidental Enter is harmless.
+  const dialog = ({ icon, title, text, yes, no = t("cancel") }) =>
+    new Promise((resolve) => {
+      const yesEl = $("#confirm-yes");
+      const noEl = $("#confirm-no");
+      confirmEl.querySelector(".badge").innerHTML = icon;
+      $("#confirm-title").textContent = title;
+      $("#confirm-text").textContent = text;
+      yesEl.textContent = yes;
+      noEl.textContent = no;
+      const returnFocus = document.activeElement;
+      confirmEl.classList.add("open");
+      noEl.focus();
+
+      const done = (answer) => {
+        confirmEl.classList.remove("open");
+        confirmEl.removeEventListener("click", onClick);
+        document.removeEventListener("keydown", onKey, true);
+        returnFocus?.focus({ preventScroll: true });
+        resolve(answer);
+      };
+      const onClick = (e) => {
+        if (e.target.closest("#confirm-yes")) done(true);
+        else if (e.target.closest("#confirm-no") || e.target === confirmEl) done(false);
+      };
+      const onKey = (e) => {
+        // Don't let Escape also close settings, or Space start the timer.
+        e.stopPropagation();
+        if (!confirmEl.contains(e.target) && e.key !== "Escape" && e.key !== "Tab") e.preventDefault();
+        if (e.key === "Escape") done(false);
+        // Keep Tab inside the dialog.
+        if (e.key === "Tab") {
+          e.preventDefault();
+          (document.activeElement === noEl ? yesEl : noEl).focus();
+        }
+      };
+      confirmEl.addEventListener("click", onClick);
+      // Capture on document so keys are ours wherever focus ended up.
+      document.addEventListener("keydown", onKey, true);
+    });
+
+  $("#reset").addEventListener("click", async () => {
+    const ok = await dialog({ icon: RESET_ICON, title: t("confirmReset"), text: t("confirmResetText"), yes: t("reset") });
+    if (!ok) return;
+    settings = defaults();
+    save();
+    reset();
+    renderAll();
+  });
+
+  // Another tab changed the settings; adopt them so our next save doesn't undo that.
+  addEventListener("storage", (e) => {
+    if (e.key !== STORAGE_KEY) return;
+    settings = load();
+    if (state === "idle") reset();
+    renderAll();
+  });
+
+  // ---------- Install as an app ----------
+
+  // Chrome, Edge and Android offer an install prompt we can trigger from our
+  // own button. iOS has none, so there we explain the Share-menu route instead.
+  let installPrompt = null;
+  const installBtn = $("#install");
+  addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    installPrompt = e;
+    installBtn.hidden = false;
+  });
+  installBtn.addEventListener("click", async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    installPrompt = null;
+    installBtn.hidden = true;
+  });
+  addEventListener("appinstalled", () => (installBtn.hidden = true));
+
+  const iosShareIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M6 11H5v10h14V11h-1"/></svg>';
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const installed = navigator.standalone || matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches;
+  const renderInstallHint = () => {
+    const hint = $("#ios-install");
+    hint.hidden = !isIOS || installed;
+    // Our own static string with an icon; no user text goes in here.
+    hint.innerHTML = t("iosInstall").replace("{share}", iosShareIcon);
+  };
+
+  if ("serviceWorker" in navigator && isSecureContext && location.protocol !== "file:") {
+    addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+  }
+
+  // ---------- Boot ----------
+
+  setState("idle");
+  renderAll();
+  draw();
+})();
+</script>
+</body>
+</html>

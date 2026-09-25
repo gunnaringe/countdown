@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Must match the Worker created by the Workers Builds import (it owns the
+  // countdown.apphub.casa custom domain). Never rename.
+  "name": "countdown",
+  "compatibility_date": "2026-09-25",
+  "assets": {
+    "directory": "public"
+  },
+  // Only reachable on the custom domain.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "countdown.apphub.casa", "custom_domain": true }
+  ]
+}
