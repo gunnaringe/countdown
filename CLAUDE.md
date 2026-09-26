@@ -33,6 +33,11 @@ of [color](https://github.com/gunnaringe/color) and styled the same way.
   in settings, sorted by time, max `MAX_QUICK`) plus the custom button. One
   dialog (`openEditor`) edits both custom times and quick picks. Presets only
   show while idle. Names are user text — only ever `textContent`.
+- **Share links:** "Share setup" encodes the settings into the URL fragment
+  (format documented above `encode()`, same style as color's). A link is
+  applied once at load — saved, then stripped with `history.replaceState` —
+  with an Undo toast. Adding a setting means deciding whether it goes in the
+  link; keep old links decoding (ignore unknown keys).
 - **i18n:** all UI strings go in the `I18N` object (`no` and `en`) and are wired
   via `data-i18n` / `data-i18n-html` / `data-i18n-title` /
   `data-i18n-placeholder`.

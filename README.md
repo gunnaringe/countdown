@@ -28,6 +28,8 @@ left. When time is up, the screen bursts into color and plays a little chime.
 
 - 🎨 **Pick a color** for the ring and the "done" screen.
 - 🔔 **Chime when time is up** — toggle it with the speaker button.
+- 🔗 **Share setup** — a link that sets up another screen or device the same
+  way (quick picks, color, sound, language), with undo on the receiving end.
 - 🔢 **Hide the numbers** if you only want the ring.
 - 🇳🇴🇬🇧 **Norwegian and English** — follows the browser, or pick one.
 - 📺 **Made for a big screen** — fullscreen button, keeps the screen awake, and

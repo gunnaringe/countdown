@@ -579,7 +579,24 @@
     background: rgba(255, 93, 143, 0.16);
   }
   .modal .badge svg { width: 1.75rem; height: 1.75rem; }
-  #confirm.open .badge svg { animation: spin-back 0.7s var(--ease-pop) 0.1s; }
+  #confirm[data-tone="accent"] .badge { color: var(--accent); background: rgba(255, 210, 63, 0.14); }
+  #confirm.open[data-tone="danger"] .badge svg { animation: spin-back 0.7s var(--ease-pop) 0.1s; }
+  #confirm .field {
+    width: 100%;
+    margin: -0.5rem 0 1.4rem;
+    padding: 0.8rem 1.1rem;
+    border: 0;
+    border-radius: 999px;
+    outline: 0;
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 0 0 2px rgba(255, 210, 63, 0.35);
+    font-size: 0.9rem;
+    text-overflow: ellipsis;
+    user-select: all;
+    -webkit-user-select: all;
+  }
+  #confirm .field[hidden] { display: none; }
+  #confirm .field::selection { background: rgba(255, 210, 63, 0.35); color: #fff; }
   @keyframes spin-back { from { transform: rotate(160deg); } }
   .modal h4 { margin: 0; font-size: 1.35rem; font-weight: 600; }
   .modal p { margin: 0.5rem 0 1.5rem; color: var(--muted); line-height: 1.4; }
@@ -588,6 +605,32 @@
   #custom .badge { color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); }
   #custom .rows { margin: 1rem 0 1.5rem; padding: 0.35rem 0.25rem 0.35rem 1.1rem; border-radius: 1.75rem; background: rgba(255, 255, 255, 0.05); text-align: left; }
   .pill.danger { background: #ff5d8f; color: #fff; }
+
+  #share { width: 100%; padding: 0.8rem; }
+
+  /* Toast after loading a link */
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: max(1.5rem, env(safe-area-inset-bottom));
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.5rem 0.5rem 0.5rem 1.4rem;
+    border-radius: 999px;
+    background: rgba(23, 22, 31, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    font-weight: 500;
+    transform: translate(-50%, 200%);
+    transition: transform 0.45s var(--ease-pop);
+  }
+  #toast.show { transform: translate(-50%, 0); }
+  #toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #toast .pill { flex: none; padding: 0.55rem 1.1rem; }
 
   #install[hidden], .install-hint[hidden] { display: none; }
   .install-hint {
@@ -724,6 +767,11 @@
       </div>
     </section>
 
+    <section>
+      <h3 data-i18n="setup"></h3>
+      <button class="pill" id="share" data-i18n="share"></button>
+    </section>
+
     <div class="footer">
       <button class="pill" id="install" data-i18n="install" hidden></button>
       <button class="ghost" id="reset" data-i18n="reset"></button>
@@ -775,11 +823,17 @@
     <div class="badge"></div>
     <h4 id="confirm-title"></h4>
     <p id="confirm-text"></p>
+    <input class="field" id="confirm-field" readonly hidden>
     <div class="actions">
       <button class="ghost" id="confirm-no"></button>
       <button class="pill danger" id="confirm-yes"></button>
     </div>
   </div>
+</div>
+
+<div id="toast" role="status">
+  <span></span>
+  <button class="pill" id="undo" data-i18n="undo"></button>
 </div>
 
 <script>
@@ -820,6 +874,14 @@
       confirmReset: "Tilbakestille alt?",
       confirmResetText: "Hurtigvalg, farge og alle innstillinger går tilbake til standard.",
       cancel: "Avbryt",
+      setup: "Oppsett",
+      share: "Del oppsett",
+      loaded: "Oppsett hentet fra lenke",
+      undo: "Angre",
+      copied: "Lenke kopiert!",
+      linkTitle: "Del oppsettet",
+      linkText: "Kopier lenken og send den til den andre enheten.",
+      copy: "Kopier",
       install: "Installer appen",
       iosInstall: "Installer som app: trykk {share} Del og velg «Legg til på Hjem-skjerm».",
       red: "Rød", orange: "Oransje", yellow: "Gul", lime: "Limegrønn", green: "Grønn",
@@ -858,6 +920,14 @@
       confirmReset: "Reset everything?",
       confirmResetText: "Quick picks, color and all settings go back to the defaults.",
       cancel: "Cancel",
+      setup: "Setup",
+      share: "Share setup",
+      loaded: "Setup loaded from link",
+      undo: "Undo",
+      copied: "Link copied!",
+      linkTitle: "Share this setup",
+      linkText: "Copy the link and open it on the other device.",
+      copy: "Copy",
       install: "Install app",
       iosInstall: "Install as an app: tap {share} Share, then “Add to Home Screen”.",
       red: "Red", orange: "Orange", yellow: "Yellow", lime: "Lime", green: "Green",
@@ -898,7 +968,104 @@
     }
   };
 
-  let settings = load();
+  // ---------- Share links ----------
+  //
+  // The Share button encodes the settings into the URL fragment. Opening such a
+  // link applies it once — it's saved to localStorage and stripped from the
+  // address bar, so bookmarks of the plain URL always get the latest setup.
+  // Same idea and style as color.apphub.casa. Anything at its default is left
+  // out. Format: `&`-separated `key=value`:
+  //
+  //   q=60~120~45_Pusse+tenner   quick picks, `~`-separated: seconds plus an
+  //                              optional `_name`. Names are percent-encoded,
+  //                              with `+` for spaces. `q=` means none.
+  //   t=450_Lekser               the picked time, same token format
+  //   c=f3a                      ring color, 3/6-digit hex
+  //   o=s | o=n | o=             options, only if not both on:
+  //                              s = sound, n = show the numbers
+  //   l=no | l=en                language. Always written — "auto" is resolved
+  //                              to what the sender sees.
+  //
+  // Links use only letters, digits and `-_~+%&=`: chat apps and notes decide
+  // where a pasted link ends, and many stop at `,` or `:` or trim trailing
+  // `.!)'`, silently dropping the rest. So names escape those too. Unknown
+  // keys and malformed tokens are ignored.
+
+  const shortHex = (hex) => {
+    const h = hex.slice(1).toLowerCase();
+    return h[0] === h[1] && h[2] === h[3] && h[4] === h[5] ? h[0] + h[2] + h[4] : h;
+  };
+  const parseHex = (s) => {
+    if (/^[0-9a-f]{3}$/i.test(s)) s = s.replace(/./g, "$&$&");
+    return /^[0-9a-f]{6}$/i.test(s) ? `#${s.toLowerCase()}` : null;
+  };
+  const encName = (n) => encodeURIComponent(n)
+    .replace(/[!'()*._~]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/%20/g, "+");
+  const decName = (n) => {
+    try { return decodeURIComponent(n.replace(/\+/g, " ")); } catch { return ""; }
+  };
+  const encPick = (q) => q.seconds + (q.name ? `_${encName(q.name)}` : "");
+  const decPick = (tok) => {
+    const [secs, name] = tok.split("_");
+    const seconds = parseInt(secs, 10);
+    if (!(seconds > 0)) return null;
+    return {
+      seconds: Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, seconds)),
+      name: name ? decName(name).trim().slice(0, 40) : "",
+    };
+  };
+
+  const encode = (st) => {
+    const d = defaults();
+    const parts = [];
+    const quick = st.quick.map(encPick).join("~");
+    if (quick !== d.quick.map(encPick).join("~")) parts.push(`q=${quick}`);
+    if (st.seconds !== d.seconds || st.name) parts.push(`t=${encPick(st)}`);
+    if (st.hex !== d.hex) parts.push(`c=${shortHex(st.hex)}`);
+    if (!(st.sound && st.showTime)) parts.push(`o=${st.sound ? "s" : ""}${st.showTime ? "n" : ""}`);
+    parts.push(`l=${st.lang === "auto" ? browserLang() : st.lang}`);
+    return parts.join("&");
+  };
+
+  const decode = (hash) => {
+    const st = defaults();
+    for (const part of hash.split("&")) {
+      const i = part.indexOf("=");
+      if (i < 0) continue;
+      const k = part.slice(0, i), v = part.slice(i + 1);
+      if (k === "q") {
+        st.quick = v.split("~").map(decPick).filter(Boolean).slice(0, MAX_QUICK).sort((a, b) => a.seconds - b.seconds);
+      } else if (k === "t") {
+        const p = decPick(v);
+        if (p) Object.assign(st, p);
+      } else if (k === "c" && parseHex(v)) {
+        st.hex = parseHex(v);
+      } else if (k === "o") {
+        st.sound = v.includes("s");
+        st.showTime = v.includes("n");
+      } else if (k === "l" && I18N[v]) {
+        st.lang = v;
+      }
+    }
+    return st;
+  };
+
+  const shareUrl = () => {
+    const hash = encode(settings);
+    return location.href.split("#")[0] + (hash ? `#${hash}` : "");
+  };
+
+  // Reads a share link from the address bar, if any, and strips it.
+  const takeHash = () => {
+    if (location.hash.length <= 1) return null;
+    const st = decode(location.hash.slice(1));
+    history.replaceState(null, "", location.href.split("#")[0]);
+    return st;
+  };
+
+  const linked = takeHash();
+  let settings = linked || load();
   const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 
   const $ = (sel) => document.querySelector(sel);
@@ -1481,20 +1648,33 @@
   const confirmEl = $("#confirm");
   const RESET_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4v4.5H8"/></svg>';
 
-  // Resolves true (yes) or false (no / Escape / backdrop). Focus starts on
-  // "no", so an accidental Enter is harmless.
-  const dialog = ({ icon, title, text, yes, no = t("cancel") }) =>
+  const LINK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>';
+
+  // Resolves true (yes) or false (no / Escape / backdrop). `onYes` may return
+  // false to keep the dialog open. Focus starts on the field if there is one,
+  // otherwise on "no", so an accidental Enter is harmless.
+  const dialog = ({ tone = "danger", icon, title, text, field, yes, no = t("cancel"), onYes }) =>
     new Promise((resolve) => {
+      const fieldEl = $("#confirm-field");
       const yesEl = $("#confirm-yes");
       const noEl = $("#confirm-no");
+      confirmEl.dataset.tone = tone;
       confirmEl.querySelector(".badge").innerHTML = icon;
       $("#confirm-title").textContent = title;
       $("#confirm-text").textContent = text;
+      fieldEl.hidden = field == null;
+      fieldEl.value = field ?? "";
       yesEl.textContent = yes;
+      yesEl.className = `pill ${tone === "danger" ? "danger" : ""}`;
       noEl.textContent = no;
       const returnFocus = document.activeElement;
       confirmEl.classList.add("open");
-      noEl.focus();
+      if (field != null) {
+        fieldEl.focus();
+        fieldEl.select();
+      } else {
+        noEl.focus();
+      }
 
       const done = (answer) => {
         confirmEl.classList.remove("open");
@@ -1503,9 +1683,12 @@
         returnFocus?.focus({ preventScroll: true });
         resolve(answer);
       };
-      const onClick = (e) => {
-        if (e.target.closest("#confirm-yes")) done(true);
-        else if (e.target.closest("#confirm-no") || e.target === confirmEl) done(false);
+      const onClick = async (e) => {
+        if (e.target.closest("#confirm-yes")) {
+          if (!onYes || (await onYes(yesEl)) !== false) done(true);
+        } else if (e.target.closest("#confirm-no") || e.target === confirmEl) {
+          done(false);
+        }
       };
       const onKey = (e) => {
         // Don't let Escape also close settings, or Space start the timer.
@@ -1515,7 +1698,9 @@
         // Keep Tab inside the dialog.
         if (e.key === "Tab") {
           e.preventDefault();
-          (document.activeElement === noEl ? yesEl : noEl).focus();
+          const stops = [fieldEl, noEl, yesEl].filter((el) => !el.hidden);
+          const i = stops.indexOf(document.activeElement);
+          stops[(i + (e.shiftKey ? -1 : 1) + stops.length) % stops.length].focus();
         }
       };
       confirmEl.addEventListener("click", onClick);
@@ -1523,14 +1708,86 @@
       document.addEventListener("keydown", onKey, true);
     });
 
+  $("#share").addEventListener("click", async () => {
+    const url = shareUrl();
+    const btn = $("#share");
+    // Native share sheet on phones/tablets; clipboard elsewhere; and if both
+    // fail, a dialog with the link ready to copy by hand.
+    if (navigator.share && matchMedia("(pointer: coarse)").matches) {
+      try {
+        await navigator.share({ title: t("appName"), url });
+        return;
+      } catch (err) {
+        if (err.name === "AbortError") return; // closed the share sheet
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      btn.textContent = t("copied");
+      setTimeout(() => (btn.textContent = t("share")), 2000);
+    } catch {
+      showLink(url);
+    }
+  });
+
+  const showLink = (url) => dialog({
+    tone: "accent",
+    icon: LINK_ICON,
+    title: t("linkTitle"),
+    text: t("linkText"),
+    field: url,
+    no: t("close"),
+    yes: t("copy"),
+    // Older copy path, from the selected field; keep the dialog open to say so.
+    onYes: async (yesBtn) => {
+      const field = $("#confirm-field");
+      field.focus();
+      field.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch {}
+      if (!ok) return false;
+      yesBtn.textContent = t("copied");
+      await new Promise((r) => setTimeout(r, 900));
+      return true;
+    },
+  });
+
   $("#reset").addEventListener("click", async () => {
     const ok = await dialog({ icon: RESET_ICON, title: t("confirmReset"), text: t("confirmResetText"), yes: t("reset") });
     if (!ok) return;
-    settings = defaults();
+    apply(defaults());
+  });
+
+  // Replaces all settings (reset, or a share link) and sets up its picked time.
+  const apply = (st) => {
+    settings = st;
     save();
     current = { seconds: settings.seconds, name: settings.name };
     reset();
     renderAll();
+  };
+
+  // After loading a link, offer to go back to what this device had before.
+  const toast = $("#toast");
+  let toastTimer;
+  const announceLoaded = (previous) => {
+    toast.querySelector("span").textContent = t("loaded");
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove("show"), 6000);
+    $("#undo").onclick = () => {
+      toast.classList.remove("show");
+      apply(previous);
+    };
+  };
+
+  // Opening another link in an already open tab.
+  addEventListener("hashchange", () => {
+    const previous = settings;
+    const st = takeHash();
+    if (!st) return;
+    apply(st);
+    announceLoaded(previous);
   });
 
   // Another tab changed the settings; adopt them so our next save doesn't undo that.
@@ -1579,6 +1836,11 @@
   setState("idle");
   renderAll();
   draw();
+  if (linked) {
+    const previous = load();
+    save();
+    announceLoaded(previous);
+  }
 })();
 </script>
 </body>
