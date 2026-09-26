@@ -750,6 +750,9 @@
   [data-theme="hacker"] #presets button { border-radius: var(--radius); background: rgba(0, 255, 65, 0.07); box-shadow: var(--neon-edge); }
   [data-theme="hacker"] #presets button:hover { background: rgba(0, 255, 65, 0.16); }
   [data-theme="hacker"] #presets button[aria-pressed="true"] { background: var(--accent); color: #000; text-shadow: none; box-shadow: 0 0 12px rgba(0, 255, 65, 0.55); }
+  /* No bounce or wiggle: it just appears, like text on a terminal. */
+  [data-theme="hacker"] #done.show { animation: appear 0.3s steps(3) forwards; }
+  @keyframes appear { to { opacity: 1; } }
   [data-theme="hacker"] #done { color: var(--accent); text-transform: uppercase; text-shadow: 0 0 24px rgba(0, 255, 65, 0.6); }
   [data-theme="hacker"] #done span::after { content: "_"; animation: blink 1s steps(1) infinite; }
   [data-theme="hacker"] #done small { text-transform: none; color: var(--text); }
@@ -1526,6 +1529,7 @@
     // iOS may have suspended it during a long timer.
     if (audio.state !== "running") audio.resume();
     const t0 = audio.currentTime + 0.05;
+    if (hacker()) return chiptune(t0);
     const notes = [523.25, 659.25, 783.99, 1046.5];
     [0, 0.9].forEach((offset) => notes.forEach((f, i) => {
       const at = t0 + offset + i * 0.13;
@@ -1540,6 +1544,30 @@
       osc.start(at);
       osc.stop(at + 0.85);
     }));
+  };
+
+  // The hacker theme's 8-bit "stage clear": square-wave notes, hard on and off.
+  const chiptune = (t0) => {
+    const tune = [
+      [783.99, 0.09], [1046.5, 0.09], [1318.51, 0.09], [1567.98, 0.09], [1318.51, 0.09], [1567.98, 0.4],
+      [0, 0.12],
+      [1046.5, 0.09], [1318.51, 0.09], [1567.98, 0.09], [2093, 0.5],
+    ];
+    let at = t0;
+    for (const [f, len] of tune) {
+      if (f) {
+        const osc = audio.createOscillator();
+        const gain = audio.createGain();
+        osc.type = "square";
+        osc.frequency.value = f;
+        gain.gain.setValueAtTime(0.09, at);
+        gain.gain.setValueAtTime(0, at + len * 0.9);
+        osc.connect(gain).connect(audio.destination);
+        osc.start(at);
+        osc.stop(at + len);
+      }
+      at += len;
+    }
   };
 
   // ---------- Idle controls ----------
