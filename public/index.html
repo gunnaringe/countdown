@@ -13,6 +13,13 @@
 <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin>
+<script>
+  // Apply the saved theme before first paint so the default doesn't flash.
+  try {
+    const theme = JSON.parse(localStorage.getItem("countdown-settings-v1"))?.theme;
+    if (theme && theme !== "default") document.documentElement.dataset.theme = theme;
+  } catch {}
+</script>
 <style>
   /* Fredoka (SIL OFL, see fonts/OFL.txt), self-hosted so the app works offline.
      One variable file per script covers every weight. */
@@ -689,6 +696,96 @@
 
   button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+  #palette-section[hidden] { display: none; }
+
+  /* ---------- Hacker theme ----------
+     The green terminal look of clock.apphub.casa: monospace, glow, scanlines,
+     square-ish corners. Same layout; everything is scoped to
+     [data-theme="hacker"] so the default theme stays exactly as it is. The
+     ring stays a ring. */
+
+  [data-theme="hacker"] {
+    --font: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --sheet: #000;
+    --sheet-2: #001a07;
+    --line: rgba(0, 255, 65, 0.2);
+    --text: #33ff66;
+    --muted: #1fae48;
+    --accent: #00ff41;
+    --radius: 4px;
+    --glow: 0 0 6px rgba(0, 255, 65, 0.45);
+    --neon-edge: inset 0 0 0 1px rgba(0, 255, 65, 0.28);
+  }
+  [data-theme="hacker"] body { text-shadow: var(--glow); }
+  [data-theme="hacker"] body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.22) 2px 3px);
+  }
+  [data-theme="hacker"] ::selection { background: rgba(0, 255, 65, 0.35); color: #fff; }
+  [data-theme="hacker"] input { caret-color: var(--accent); }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Timer */
+  [data-theme="hacker"] #ring .track { stroke: rgba(0, 255, 65, 0.1); }
+  [data-theme="hacker"] #ring .bar { stroke-linecap: butt; filter: drop-shadow(0 0 10px rgba(0, 255, 65, 0.6)); }
+  [data-theme="hacker"] #time { font-weight: 400; letter-spacing: -0.06em; color: var(--text); text-shadow: 0 0 18px rgba(0, 255, 65, 0.55); }
+  [data-theme="hacker"] #label { color: var(--accent); }
+  [data-theme="hacker"] #label::before { content: "$ "; color: var(--muted); }
+  [data-theme="hacker"] #hint { color: var(--muted); }
+  [data-theme="hacker"] #hint::before { content: "> "; color: var(--accent); }
+  [data-theme="hacker"] #hint::after { content: "▌"; margin-left: 0.15em; color: var(--accent); animation: blink 1s steps(1) infinite; }
+  [data-theme="hacker"] #hint kbd { border-radius: var(--radius); border-color: rgba(0, 255, 65, 0.45); color: var(--accent); }
+  [data-theme="hacker"] #presets button { border-radius: var(--radius); background: rgba(0, 255, 65, 0.07); box-shadow: var(--neon-edge); }
+  [data-theme="hacker"] #presets button:hover { background: rgba(0, 255, 65, 0.16); }
+  [data-theme="hacker"] #presets button[aria-pressed="true"] { background: var(--accent); color: #000; text-shadow: none; box-shadow: 0 0 12px rgba(0, 255, 65, 0.55); }
+  [data-theme="hacker"] #done { color: var(--accent); text-transform: uppercase; text-shadow: 0 0 24px rgba(0, 255, 65, 0.6); }
+  [data-theme="hacker"] #done span::after { content: "_"; animation: blink 1s steps(1) infinite; }
+  [data-theme="hacker"] #done small { text-transform: none; color: var(--text); }
+
+  /* Floating buttons */
+  [data-theme="hacker"] .fab { border-radius: var(--radius); background: rgba(0, 255, 65, 0.1); color: var(--accent); box-shadow: var(--neon-edge); }
+  [data-theme="hacker"] .fab:hover { background: rgba(0, 255, 65, 0.2); }
+
+  /* Settings and dialogs */
+  [data-theme="hacker"] #sheet,
+  [data-theme="hacker"] .modal .card {
+    border-radius: var(--radius);
+    background: linear-gradient(160deg, var(--sheet-2), var(--sheet) 60%);
+    box-shadow: 0 0 0 1px rgba(0, 255, 65, 0.35), 0 0 40px rgba(0, 255, 65, 0.12), 0 30px 80px rgba(0, 0, 0, 0.7);
+  }
+  [data-theme="hacker"] .sheet-head h2,
+  [data-theme="hacker"] .modal h4 { color: var(--accent); }
+  [data-theme="hacker"] .sheet-head h2 .blob { border-radius: 0; width: 0.6em; height: 1.1em; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: blink 1s steps(1) infinite; }
+  [data-theme="hacker"] section h3::before { content: "// "; }
+  [data-theme="hacker"] :is(.card, #custom .rows) { border-radius: var(--radius); background: rgba(0, 255, 65, 0.045); box-shadow: var(--neon-edge); }
+  [data-theme="hacker"] :is(.round, .ghost, .pill, .segmented, .segmented button, .segmented .thumb, .text-input, .stepper input, .switch .track, .switch .track::after, #confirm .field, #toast, .repo, .modal .badge) { border-radius: var(--radius); }
+  [data-theme="hacker"] :is(.round, .ghost) { background: rgba(0, 255, 65, 0.07); color: var(--accent); box-shadow: var(--neon-edge); }
+  [data-theme="hacker"] .round:hover { background: rgba(0, 255, 65, 0.16); }
+  [data-theme="hacker"] .ghost:hover { background: rgba(255, 77, 77, 0.15); color: #ff4d4d; }
+  [data-theme="hacker"] #quick-list .add .round { box-shadow: none; }
+  [data-theme="hacker"] #quick-list .dot { border-radius: 0; box-shadow: 0 0 6px var(--accent); }
+  [data-theme="hacker"] .pill { color: #000; text-shadow: none; box-shadow: 0 0 14px rgba(0, 255, 65, 0.45); }
+  [data-theme="hacker"] .pill.danger { background: #ff4d4d; color: #000; box-shadow: 0 0 14px rgba(255, 77, 77, 0.5); }
+  [data-theme="hacker"] .text-input { background: rgba(0, 255, 65, 0.06); box-shadow: var(--neon-edge); }
+  [data-theme="hacker"] .text-input:focus { box-shadow: inset 0 0 0 1px var(--accent), 0 0 10px rgba(0, 255, 65, 0.35); }
+  [data-theme="hacker"] .switch .track { background: rgba(0, 255, 65, 0.08); box-shadow: var(--neon-edge); }
+  [data-theme="hacker"] .switch .track::after { background: var(--muted); box-shadow: none; }
+  [data-theme="hacker"] .switch input:checked + .track { background: rgba(0, 255, 65, 0.28); box-shadow: inset 0 0 0 1px var(--accent); }
+  [data-theme="hacker"] .switch input:checked + .track::after { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  [data-theme="hacker"] .segmented { background: rgba(0, 255, 65, 0.07); box-shadow: var(--neon-edge); }
+  [data-theme="hacker"] .segmented .thumb { box-shadow: 0 0 12px rgba(0, 255, 65, 0.55); }
+  [data-theme="hacker"] .segmented button[aria-pressed="true"] { color: #000; text-shadow: none; }
+  [data-theme="hacker"] .modal .badge { color: #ff4d4d; background: rgba(255, 77, 77, 0.12); box-shadow: 0 0 0 1px rgba(255, 77, 77, 0.4); }
+  [data-theme="hacker"] :is(#confirm[data-tone="accent"], #custom) .badge { color: var(--accent); background: rgba(0, 255, 65, 0.1); box-shadow: var(--neon-edge); }
+  [data-theme="hacker"] #confirm .field { background: rgba(0, 255, 65, 0.06); box-shadow: inset 0 0 0 1px var(--accent); }
+  [data-theme="hacker"] #toast { background: rgba(0, 10, 3, 0.94); box-shadow: 0 0 0 1px rgba(0, 255, 65, 0.4), 0 0 24px rgba(0, 255, 65, 0.15); }
+  [data-theme="hacker"] #toast .pill { text-shadow: none; }
+  [data-theme="hacker"] .repo:hover { background: rgba(0, 255, 65, 0.08); }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   }
@@ -743,6 +840,15 @@
     </section>
 
     <section>
+      <h3 data-i18n="theme"></h3>
+      <div class="segmented" id="theme">
+        <span class="thumb"></span>
+        <button data-value="default" data-i18n="themeDefault"></button>
+        <button data-value="hacker" data-i18n="themeHacker"></button>
+      </div>
+    </section>
+
+    <section id="palette-section">
       <h3 data-i18n="color"></h3>
       <div class="palette"></div>
     </section>
@@ -870,6 +976,7 @@
       sound: "Lyd når tiden er ute",
       showTime: "Vis tallene",
       language: "Språk",
+      theme: "Tema", themeDefault: "Standard", themeHacker: "Hacker",
       reset: "Tilbakestill alt",
       confirmReset: "Tilbakestille alt?",
       confirmResetText: "Hurtigvalg, farge og alle innstillinger går tilbake til standard.",
@@ -916,6 +1023,7 @@
       sound: "Sound when time is up",
       showTime: "Show the numbers",
       language: "Language",
+      theme: "Theme", themeDefault: "Default", themeHacker: "Hacker",
       reset: "Reset everything",
       confirmReset: "Reset everything?",
       confirmResetText: "Quick picks, color and all settings go back to the defaults.",
@@ -954,6 +1062,7 @@
     name: "",
     quick: QUICK.map((q) => ({ ...q })),
     hex: PRESETS.yellow,
+    theme: "default",
     sound: true,
     showTime: true,
   });
@@ -985,6 +1094,8 @@
   //                              s = sound, n = show the numbers
   //   l=no | l=en                language. Always written — "auto" is resolved
   //                              to what the sender sees.
+  //   h=1                        hacker theme (default theme if left out; `t`
+  //                              is taken, unlike in color)
   //
   // Links use only letters, digits and `-_~+%&=`: chat apps and notes decide
   // where a pasted link ends, and many stop at `,` or `:` or trim trailing
@@ -1025,6 +1136,7 @@
     if (st.hex !== d.hex) parts.push(`c=${shortHex(st.hex)}`);
     if (!(st.sound && st.showTime)) parts.push(`o=${st.sound ? "s" : ""}${st.showTime ? "n" : ""}`);
     parts.push(`l=${st.lang === "auto" ? browserLang() : st.lang}`);
+    if (st.theme === "hacker") parts.push("h=1");
     return parts.join("&");
   };
 
@@ -1046,6 +1158,8 @@
         st.showTime = v.includes("n");
       } else if (k === "l" && I18N[v]) {
         st.lang = v;
+      } else if (k === "h") {
+        st.theme = v === "1" ? "hacker" : "default";
       }
     }
     return st;
@@ -1106,6 +1220,12 @@
     });
     return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.35;
   };
+
+  // The hacker theme is green on black whatever color is picked.
+  const HACKER_GREEN = "#00ff41";
+  const hacker = () => settings.theme === "hacker";
+  const ringHex = () => (hacker() ? HACKER_GREEN : settings.hex);
+  const doneHex = () => (hacker() ? "#000000" : settings.hex);
 
   const paint = (hex, x, y) => {
     const splash = document.createElement("div");
@@ -1211,8 +1331,9 @@
     left = 0;
     setState("done");
     draw();
-    paint(settings.hex);
-    doneEl.style.color = isLight(settings.hex) ? "rgba(0,0,0,0.78)" : "rgba(255,255,255,0.92)";
+    paint(doneHex());
+    // The hacker theme colors it in CSS.
+    doneEl.style.color = hacker() ? "" : isLight(settings.hex) ? "rgba(0,0,0,0.78)" : "rgba(255,255,255,0.92)";
     doneEl.classList.remove("show");
     doneEl.offsetWidth; // restart the pop animation
     doneEl.classList.add("show");
@@ -1232,7 +1353,7 @@
   };
 
   const celebrate = () => {
-    const colors = Object.values(PRESETS);
+    const colors = hacker() ? ["#00ff41", "#33ff66", "#9dff00", "#1fae48", "#c9ffd9"] : Object.values(PRESETS);
     const spread = Math.max(innerWidth, innerHeight) * 0.6;
     for (let i = 0; i < 36; i++) {
       const dot = document.createElement("span");
@@ -1243,7 +1364,7 @@
       dot.style.setProperty("--dy", `${Math.sin(a) * d}px`);
       dot.style.setProperty("--s", `${0.8 + Math.random() * 1.8}rem`);
       // Skip the background's own color, it would be invisible.
-      dot.style.setProperty("--c", colors.filter((c) => c !== settings.hex)[i % (colors.length - 1)]);
+      dot.style.setProperty("--c", colors.filter((c) => c !== doneHex())[i % (colors.length - 1)]);
       dot.style.animationDelay = `${Math.random() * 0.15}s`;
       dot.addEventListener("animationend", () => dot.remove());
       document.body.append(dot);
@@ -1563,8 +1684,11 @@
   }
 
   const renderColor = () => {
-    document.body.style.setProperty("--c", settings.hex);
-    document.body.style.setProperty("--ink", isLight(settings.hex) ? "#17161f" : "#fff");
+    if (hacker()) document.documentElement.dataset.theme = "hacker";
+    else delete document.documentElement.dataset.theme;
+    $("#palette-section").hidden = hacker();
+    document.body.style.setProperty("--c", ringHex());
+    document.body.style.setProperty("--ink", isLight(ringHex()) ? "#17161f" : "#fff");
     palette.querySelectorAll("button").forEach((b) => {
       b.setAttribute("aria-pressed", b.dataset.hex === settings.hex);
       b.title = t(b.dataset.key);
@@ -1590,7 +1714,10 @@
     $("#show-time").checked = settings.showTime;
     timeEl.classList.toggle("hide", !settings.showTime);
     // Segmented thumbs measure their buttons, so they need the sheet laid out.
-    requestAnimationFrame(() => setSegmented($("#lang"), settings.lang));
+    requestAnimationFrame(() => {
+      setSegmented($("#lang"), settings.lang);
+      setSegmented($("#theme"), settings.theme);
+    });
   };
 
   const renderTitle = () => {
@@ -1634,6 +1761,15 @@
     }
   });
   $("#show-time").addEventListener("change", (e) => { settings.showTime = e.target.checked; save(); renderOptions(); });
+
+  $("#theme").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    settings.theme = b.dataset.value;
+    save();
+    renderAll();
+    if (state === "done") paint(doneHex());
+  });
 
   $("#lang").addEventListener("click", (e) => {
     const b = e.target.closest("button");

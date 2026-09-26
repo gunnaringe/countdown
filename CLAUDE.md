@@ -48,6 +48,12 @@ of [color](https://github.com/gunnaringe/color) and styled the same way.
   square boxes or sharp corners, springy `--ease-pop` transitions. Shared CSS
   blocks (`.fab`, `.round`, `.pill`, `.switch`, `.segmented`, sheet, dialog)
   are copied from color; keep them in step if one side changes.
+- **Themes:** `settings.theme` is `default` or `hacker`, set on
+  `<html data-theme>` (also by a tiny `<head>` script before first paint). All
+  hacker CSS is scoped under `[data-theme="hacker"]`, styled after
+  world-clock/time (green `#00ff41`, monospace, scanlines, 4px corners). Colors
+  go through `ringHex()`/`doneHex()` — hacker ignores `settings.hex`, and the
+  palette is hidden then.
 - **Testing:** serve `public/` with `python3 -m http.server` and drive it in
   headless Chromium via Playwright: run a short timer to done, check space
   pauses (time holds), tap resumes, `r`/↺ resets, preset taps don't start it,

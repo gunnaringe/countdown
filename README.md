@@ -27,6 +27,7 @@ left. When time is up, the screen bursts into color and plays a little chime.
 ## Features
 
 - 🎨 **Pick a color** for the ring and the "done" screen.
+- 💻 **Hacker theme** — green-on-black terminal look, like clock.apphub.casa.
 - 🔔 **Chime when time is up** — toggle it with the speaker button.
 - 🔗 **Share setup** — a link that sets up another screen or device the same
   way (quick picks, color, sound, language), with undo on the receiving end.
