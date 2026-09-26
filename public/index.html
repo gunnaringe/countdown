@@ -270,6 +270,14 @@
     pointer-events: none;
     animation: burst 1.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
+  /* Hacker theme: pixel space invaders instead of dots. */
+  .confetti.invader {
+    height: auto;
+    aspect-ratio: var(--ar);
+    border-radius: 0;
+    -webkit-mask: var(--m) center / contain no-repeat;
+    mask: var(--m) center / contain no-repeat;
+  }
   @keyframes burst {
     0% { transform: translate(0, 0) scale(0.2); opacity: 1; }
     70% { opacity: 1; }
@@ -1448,6 +1456,18 @@
     if (wasDone) paint("#000000", x, y);
   };
 
+  // Classic space invader sprites, one row per string, `X` = a lit pixel.
+  const INVADERS = [
+    ["..X.....X..", "...X...X...", "..XXXXXXX..", ".XX.XXX.XX.", "XXXXXXXXXXX", "X.XXXXXXX.X", "X.X.....X.X", "...XX.XX..."],
+    ["...XX...", "..XXXX..", ".XXXXXX.", "XX.XX.XX", "XXXXXXXX", "..X..X..", ".X.XX.X.", "X.X..X.X"],
+    ["....XXXX....", ".XXXXXXXXXX.", "XXXXXXXXXXXX", "XXX..XX..XXX", "XXXXXXXXXXXX", "...XX..XX...", "..XX.XX.XX..", "XX........XX"],
+  ].map((rows) => {
+    const w = rows[0].length, h = rows.length;
+    const px = rows.flatMap((r, y) => [...r].map((c, x) => (c === "X" ? `M${x} ${y}h1v1h-1z` : ""))).join("");
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges"><path d="${px}"/></svg>`;
+    return { ar: `${w} / ${h}`, mask: `url("data:image/svg+xml,${encodeURIComponent(svg)}")` };
+  });
+
   const celebrate = () => {
     const colors = hacker() ? ["#00ff41", "#33ff66", "#9dff00", "#1fae48", "#c9ffd9"] : Object.values(PRESETS);
     const spread = Math.max(innerWidth, innerHeight) * 0.6;
@@ -1458,7 +1478,15 @@
       const d = spread * (0.35 + Math.random() * 0.65);
       dot.style.setProperty("--dx", `${Math.cos(a) * d}px`);
       dot.style.setProperty("--dy", `${Math.sin(a) * d}px`);
-      dot.style.setProperty("--s", `${0.8 + Math.random() * 1.8}rem`);
+      if (hacker()) {
+        const inv = INVADERS[i % INVADERS.length];
+        dot.classList.add("invader");
+        dot.style.setProperty("--m", inv.mask);
+        dot.style.setProperty("--ar", inv.ar);
+        dot.style.setProperty("--s", `${1.6 + Math.random() * 1.8}rem`);
+      } else {
+        dot.style.setProperty("--s", `${0.8 + Math.random() * 1.8}rem`);
+      }
       // Skip the background's own color, it would be invisible.
       dot.style.setProperty("--c", colors.filter((c) => c !== doneHex())[i % (colors.length - 1)]);
       dot.style.animationDelay = `${Math.random() * 0.15}s`;
