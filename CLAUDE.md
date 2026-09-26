@@ -26,12 +26,13 @@ of [color](https://github.com/gunnaringe/color) and styled the same way.
 - **Sound:** toggled by the speaker button in `#controls` (not in settings).
   The `AudioContext` is created/resumed in the tap or key press that starts the
   timer (`unlockAudio`); created later, iOS silently blocks it.
-- **Current vs default time:** `current` (`{ seconds, name }`, in memory) is
-  the timer that's set up — a quick pick, a custom one, or the defaults. It's
-  what `reset()` and ↺ reuse. `settings.seconds`/`settings.name` are only the
-  defaults: used at boot, and applied to `current` right away while idle.
-  Presets and custom only show while idle. The name is user text — only ever
-  `textContent`.
+- **Time picks:** `current` (`{ seconds, name }`) is the timer that's set up;
+  `reset()` and ↺ reuse it. `pick()` sets it and saves it as
+  `settings.seconds`/`settings.name` so a reload keeps it — those aren't shown
+  in settings. The buttons under the ring come from `settings.quick` (edited
+  in settings, sorted by time, max `MAX_QUICK`) plus the custom button. One
+  dialog (`openEditor`) edits both custom times and quick picks. Presets only
+  show while idle. Names are user text — only ever `textContent`.
 - **i18n:** all UI strings go in the `I18N` object (`no` and `en`) and are wired
   via `data-i18n` / `data-i18n-html` / `data-i18n-title` /
   `data-i18n-placeholder`.

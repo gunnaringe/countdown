@@ -18,9 +18,9 @@ left. When time is up, the screen bursts into color and plays a little chime.
 ## How to use
 
 1. Open the page on a TV, tablet or laptop — ideally fullscreen (⛶ button).
-2. Pick a time: tap 1, 2, 3, 5, 10 or 15 minutes, or ✏️ for any minutes and
-   seconds, with an optional name shown above the ring ("Brush teeth").
-   Settings (⚙) sets the default time and name it starts with.
+2. Pick a time: tap one of the quick picks (1, 2, 3, 5, 10, 15 minutes), or
+   ✏️ for any minutes and seconds, with an optional name shown above the ring
+   ("Brush teeth"). Change, add or remove the quick picks in settings (⚙).
 3. Press **space**, **Enter** or tap anywhere to start. Tap again to pause.
 4. **↺**, **R** or **Esc** starts over.
 
