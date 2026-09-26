@@ -212,7 +212,8 @@
     padding: 0 2rem;
     transition: opacity 0.3s;
   }
-  body[data-state="running"] #hint { opacity: 0; }
+  /* Gone at once when it starts, so it can't flash while moving out of the way. */
+  body[data-state="running"] #hint { opacity: 0; transition: none; }
   body.light #hint { color: rgba(0, 0, 0, 0.55); }
   body.light #hint kbd { border-color: rgba(0, 0, 0, 0.3); }
   #hint kbd {
@@ -1367,7 +1368,8 @@
     state = s;
     document.body.dataset.state = s;
     $("#restart").hidden = s === "idle";
-    hint.innerHTML = t({ idle: isTarget() ? "hintShow" : "hintStart", running: "hintStart", paused: "hintPaused", done: "hintDone" }[s]);
+    // Running hides the hint, so it keeps whatever it said.
+    if (s !== "running") hint.innerHTML = t({ idle: isTarget() ? "hintShow" : "hintStart", paused: "hintPaused", done: "hintDone" }[s]);
     renderTitle();
   };
 
