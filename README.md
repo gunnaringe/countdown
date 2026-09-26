@@ -18,14 +18,16 @@ left. When time is up, the screen bursts into color and plays a little chime.
 ## How to use
 
 1. Open the page on a TV, tablet or laptop — ideally fullscreen (⛶ button).
-2. Pick a time: tap 1, 2, 3, 5, 10 or 15 minutes, or set any time in settings (⚙).
+2. Pick a time: tap 1, 2, 3, 5, 10 or 15 minutes, or ✏️ for any minutes and
+   seconds, with an optional name shown above the ring ("Brush teeth").
+   Settings (⚙) sets the default time and name it starts with.
 3. Press **space**, **Enter** or tap anywhere to start. Tap again to pause.
 4. **↺**, **R** or **Esc** starts over.
 
 ## Features
 
 - 🎨 **Pick a color** for the ring and the "done" screen.
-- 🔔 **Chime when time is up** (toggle).
+- 🔔 **Chime when time is up** — toggle it with the speaker button.
 - 🔢 **Hide the numbers** if you only want the ring.
 - 🇳🇴🇬🇧 **Norwegian and English** — follows the browser, or pick one.
 - 📺 **Made for a big screen** — fullscreen button, keeps the screen awake, and

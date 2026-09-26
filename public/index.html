@@ -57,6 +57,7 @@
   }
 
   button, input { font: inherit; color: inherit; }
+  input { user-select: text; -webkit-user-select: text; }
   button { cursor: pointer; }
 
   /* ---------- Stage ---------- */
@@ -99,6 +100,23 @@
   }
   body[data-state="running"] #main,
   body[data-state="paused"] #main { --size: min(88vw, 86dvh); }
+  /* Make room for the name above the ring. */
+  body.named #main { --size: min(80vw, calc(100dvh - 19rem), 40rem); }
+  body.named[data-state="running"] #main,
+  body.named[data-state="paused"] #main { --size: min(88vw, calc(86dvh - 5rem)); }
+
+  #label {
+    max-width: 100%;
+    font-size: clamp(1.5rem, 5.5vmin, 3.2rem);
+    font-weight: 600;
+    line-height: 1.15;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.85);
+    overflow-wrap: anywhere;
+    transition: opacity 0.3s;
+  }
+  #label:empty { display: none; }
+  body[data-state="done"] #label { opacity: 0; }
 
   #ring {
     position: relative;
@@ -169,6 +187,7 @@
   #presets button:hover { background: rgba(255, 255, 255, 0.18); transform: scale(1.1); }
   #presets button:active { transform: scale(0.9); }
   #presets button[aria-pressed="true"] { background: var(--c); color: var(--ink); }
+  #presets button svg { width: 1.3rem; height: 1.3rem; }
 
   #hint {
     margin: 0;
@@ -211,6 +230,8 @@
     padding: 0 1rem;
     opacity: 0;
   }
+  #done small { display: block; margin-top: 0.3em; font-size: 0.32em; font-weight: 600; opacity: 0.85; }
+  #done small:empty { display: none; }
   #done.show { animation: pop 0.5s var(--ease-pop) forwards, wiggle 2.4s ease-in-out 0.6s infinite; }
   @keyframes pop {
     from { opacity: 0; transform: scale(0.6) rotate(-4deg); }
@@ -276,6 +297,8 @@
   #gear:hover svg { transform: rotate(60deg); }
   #restart svg { transition: transform 0.6s var(--ease-pop); }
   #restart:hover svg { transform: rotate(-120deg); }
+  #sound[aria-pressed="false"] .on,
+  #sound[aria-pressed="true"] .off { display: none; }
   body.light .fab { background: rgba(0, 0, 0, 0.12); color: #111; }
   body.light .fab:hover { background: rgba(0, 0, 0, 0.2); }
 
@@ -464,18 +487,38 @@
     transition: left 0.35s var(--ease-pop), width 0.35s var(--ease-pop);
   }
 
-  /* Steppers */
+  /* Steppers; the number can be typed in too. */
   .stepper { display: flex; align-items: center; gap: 0.5rem; }
-  .stepper output {
-    min-width: 3.2rem;
+  .stepper input {
+    width: 3.2rem;
+    padding: 0.3rem 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
     text-align: center;
     font-size: 1.1rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
+    transition: background 0.2s;
   }
+  .stepper input:hover { background: rgba(255, 255, 255, 0.06); }
+  .stepper input:focus { outline: none; background: rgba(255, 255, 255, 0.1); }
 
-  /* Confirm dialog */
-  #confirm {
+  .text-input {
+    flex: 1;
+    min-width: 0;
+    max-width: 14rem;
+    padding: 0.55rem 1rem;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 1rem;
+  }
+  .text-input::placeholder { color: var(--muted); }
+  .text-input:focus { outline: none; box-shadow: 0 0 0 3px var(--accent); }
+
+  /* Dialogs (confirm, custom time) */
+  .modal {
     position: fixed;
     inset: 0;
     z-index: 40;
@@ -490,8 +533,8 @@
     transition: opacity 0.2s, visibility 0.2s;
   }
   /* Visible at once when opening, so the Cancel button can take focus. */
-  #confirm.open { opacity: 1; visibility: visible; transition: opacity 0.2s, visibility 0s; }
-  #confirm .card {
+  .modal.open { opacity: 1; visibility: visible; transition: opacity 0.2s, visibility 0s; }
+  .modal .card {
     width: min(100%, 21rem);
     padding: 1.75rem 1.5rem 1.5rem;
     border-radius: 2.25rem;
@@ -501,8 +544,8 @@
     transform: scale(0.85);
     transition: transform 0.4s var(--ease-pop);
   }
-  #confirm.open .card { transform: none; }
-  #confirm .badge {
+  .modal.open .card { transform: none; }
+  .modal .badge {
     width: 3.75rem;
     height: 3.75rem;
     margin: 0 auto 1rem;
@@ -512,13 +555,15 @@
     color: #ff9dbb;
     background: rgba(255, 93, 143, 0.16);
   }
-  #confirm .badge svg { width: 1.75rem; height: 1.75rem; }
+  .modal .badge svg { width: 1.75rem; height: 1.75rem; }
   #confirm.open .badge svg { animation: spin-back 0.7s var(--ease-pop) 0.1s; }
   @keyframes spin-back { from { transform: rotate(160deg); } }
-  #confirm h4 { margin: 0; font-size: 1.35rem; font-weight: 600; }
-  #confirm p { margin: 0.5rem 0 1.5rem; color: var(--muted); line-height: 1.4; }
-  #confirm .actions { display: flex; gap: 0.6rem; }
-  #confirm .actions button { flex: 1; padding: 0.8rem 1rem; }
+  .modal h4 { margin: 0; font-size: 1.35rem; font-weight: 600; }
+  .modal p { margin: 0.5rem 0 1.5rem; color: var(--muted); line-height: 1.4; }
+  .modal .actions { display: flex; gap: 0.6rem; }
+  .modal .actions button { flex: 1; padding: 0.8rem 1rem; }
+  #custom .badge { color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); }
+  #custom .rows { margin: 1rem 0 1.5rem; padding: 0.35rem 0.25rem 0.35rem 1.1rem; border-radius: 1.75rem; background: rgba(255, 255, 255, 0.05); text-align: left; }
   .pill.danger { background: #ff5d8f; color: #fff; }
 
   #install[hidden], .install-hint[hidden] { display: none; }
@@ -588,6 +633,7 @@
 <div id="stage" aria-live="polite"></div>
 
 <div id="main">
+  <div id="label"></div>
   <div id="ring">
     <svg viewBox="0 0 200 200" aria-hidden="true">
       <circle class="track" cx="100" cy="100" r="86"/>
@@ -599,7 +645,7 @@
   <p id="hint"></p>
 </div>
 
-<div id="done" data-i18n="done"></div>
+<div id="done"><div><span data-i18n="done"></span><small id="done-name"></small></div></div>
 
 <div id="controls">
   <button class="fab" id="restart" data-i18n-title="restart" hidden>
@@ -607,6 +653,9 @@
   </button>
   <button class="fab" id="fullscreen" data-i18n-title="fullscreen">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path class="enter" d="M4 9V6a2 2 0 0 1 2-2h3M15 4h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M9 20H6a2 2 0 0 1-2-2v-3"/><path class="exit" style="display:none" d="M9 4v3a2 2 0 0 1-2 2H4M20 9h-3a2 2 0 0 1-2-2V4M15 20v-3a2 2 0 0 1 2-2h3M4 15h3a2 2 0 0 1 2 2v3"/></svg>
+  </button>
+  <button class="fab" id="sound" data-i18n-title="sound">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="on" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
   </button>
   <button class="fab" id="gear" data-i18n-title="settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -623,23 +672,27 @@
     </div>
 
     <section>
-      <h3 data-i18n="time"></h3>
-      <div class="card">
+      <h3 data-i18n="defaultTime"></h3>
+      <div class="card" id="defaults">
         <div class="row">
           <span class="text" data-i18n="minutes"></span>
           <div class="stepper">
-            <button class="round" id="min-down" aria-label="−"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
-            <output id="min"></output>
-            <button class="round" id="min-up" aria-label="+"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
+            <button type="button" class="round" data-step="-60" aria-label="−"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
+            <input class="min" inputmode="numeric" maxlength="2" autocomplete="off" data-i18n-title="minutes">
+            <button type="button" class="round" data-step="60" aria-label="+"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
           </div>
         </div>
         <div class="row">
           <span class="text" data-i18n="seconds"></span>
           <div class="stepper">
-            <button class="round" id="sec-down" aria-label="−"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
-            <output id="sec"></output>
-            <button class="round" id="sec-up" aria-label="+"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
+            <button type="button" class="round" data-step="-5" aria-label="−"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
+            <input class="sec" inputmode="numeric" maxlength="2" autocomplete="off" data-i18n-title="seconds">
+            <button type="button" class="round" data-step="5" aria-label="+"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
           </div>
+        </div>
+        <div class="row">
+          <label class="text" for="default-name" data-i18n="name"></label>
+          <input class="text-input" id="default-name" maxlength="40" autocomplete="off" data-i18n-placeholder="optional">
         </div>
       </div>
     </section>
@@ -652,10 +705,6 @@
     <section>
       <h3 data-i18n="options"></h3>
       <div class="card">
-        <div class="row">
-          <label class="text" for="sound" data-i18n="sound"></label>
-          <span class="switch"><input type="checkbox" id="sound"><span class="track"></span></span>
-        </div>
         <div class="row">
           <label class="text" for="show-time" data-i18n="showTime"></label>
           <span class="switch"><input type="checkbox" id="show-time"><span class="track"></span></span>
@@ -686,7 +735,40 @@
   </div>
 </div>
 
-<div id="confirm">
+<div id="custom" class="modal">
+  <form class="card" role="dialog" aria-modal="true" aria-labelledby="custom-title">
+    <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/></svg></div>
+    <h4 id="custom-title" data-i18n="customTitle"></h4>
+    <div class="rows">
+      <div class="row">
+        <span class="text" data-i18n="minutes"></span>
+        <div class="stepper">
+          <button type="button" class="round" data-step="-60" aria-label="−"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
+          <input class="min" inputmode="numeric" maxlength="2" autocomplete="off" data-i18n-title="minutes">
+          <button type="button" class="round" data-step="60" aria-label="+"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="text" data-i18n="seconds"></span>
+        <div class="stepper">
+          <button type="button" class="round" data-step="-5" aria-label="−"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
+          <input class="sec" inputmode="numeric" maxlength="2" autocomplete="off" data-i18n-title="seconds">
+          <button type="button" class="round" data-step="5" aria-label="+"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
+        </div>
+      </div>
+      <div class="row">
+        <label class="text" for="custom-name" data-i18n="name"></label>
+        <input class="text-input" id="custom-name" maxlength="40" autocomplete="off" data-i18n-placeholder="optional">
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" class="ghost" id="custom-no" data-i18n="cancel"></button>
+      <button type="submit" class="pill" data-i18n="use"></button>
+    </div>
+  </form>
+</div>
+
+<div id="confirm" class="modal">
   <div class="card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
     <div class="badge"></div>
     <h4 id="confirm-title"></h4>
@@ -714,12 +796,17 @@
       settings: "Innstillinger",
       fullscreen: "Fullskjerm",
       close: "Lukk",
-      time: "Tid",
+      custom: "egen",
+      customTitle: "Egen tid",
+      use: "Bruk",
+      defaultTime: "Standardtid",
       minutes: "Minutter",
       seconds: "Sekunder",
+      name: "Navn",
+      optional: "Valgfritt",
       color: "Farge",
       options: "Valg",
-      sound: "Spill en lyd når tiden er ute",
+      sound: "Lyd når tiden er ute",
       showTime: "Vis tallene",
       language: "Språk",
       reset: "Tilbakestill alt",
@@ -742,12 +829,17 @@
       settings: "Settings",
       fullscreen: "Fullscreen",
       close: "Close",
-      time: "Time",
+      custom: "custom",
+      customTitle: "Custom time",
+      use: "Set",
+      defaultTime: "Default time",
       minutes: "Minutes",
       seconds: "Seconds",
+      name: "Name",
+      optional: "Optional",
       color: "Color",
       options: "Options",
-      sound: "Play a sound when time is up",
+      sound: "Sound when time is up",
       showTime: "Show the numbers",
       language: "Language",
       reset: "Reset everything",
@@ -775,6 +867,7 @@
   const defaults = () => ({
     lang: "auto",
     seconds: 5 * 60,
+    name: "",
     hex: PRESETS.yellow,
     sound: true,
     showTime: true,
@@ -814,6 +907,7 @@
     document.documentElement.lang = lang();
     document.querySelectorAll("[data-i18n]").forEach((el) => (el.textContent = t(el.dataset.i18n)));
     document.querySelectorAll("[data-i18n-html]").forEach((el) => (el.innerHTML = t(el.dataset.i18nHtml)));
+    document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => (el.placeholder = t(el.dataset.i18nPlaceholder)));
     document.querySelectorAll("[data-i18n-title]").forEach((el) => {
       el.title = t(el.dataset.i18nTitle);
       el.setAttribute("aria-label", el.title);
@@ -856,8 +950,10 @@
   // throttled background tab can't make the timer drift. requestAnimationFrame
   // only draws; finishing has its own timeout, which runs in the background too.
 
+  // The timer that's set up now: a quick pick, a custom one, or the defaults.
+  let current = { seconds: settings.seconds, name: settings.name };
   let state = "idle";
-  let total = settings.seconds * 1000;
+  let total = current.seconds * 1000;
   let left = total;   // ms left, while idle or paused
   let endAt = 0;      // Date.now() when time is up, while running
   let doneTimer = null;
@@ -946,7 +1042,7 @@
     clearTimeout(doneTimer);
     cancelAnimationFrame(frame);
     const wasDone = state === "done";
-    total = left = settings.seconds * 1000;
+    total = left = current.seconds * 1000;
     doneEl.classList.remove("show");
     setState("idle");
     draw();
@@ -973,7 +1069,7 @@
   };
 
   const advance = (x, y) => {
-    if (scrim.classList.contains("open")) return;
+    if (scrim.classList.contains("open") || customEl.classList.contains("open")) return;
     if (state === "idle" || state === "paused") start();
     else if (state === "running") pause();
     else reset(x, y);
@@ -984,6 +1080,10 @@
   $("#restart").addEventListener("click", () => reset());
 
   document.addEventListener("keydown", (e) => {
+    if (customEl.classList.contains("open")) {
+      if (e.key === "Escape") closeCustom();
+      return;
+    }
     if (scrim.classList.contains("open")) {
       if (e.key === "Escape") closeSettings();
       return;
@@ -1078,13 +1178,14 @@
 
   // ---------- Presets & settings ----------
 
-  // Changing the time while a timer is going leaves it alone; it's used next time.
-  const setSeconds = (s) => {
-    settings.seconds = Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, s));
-    save();
-    if (state === "idle") reset();
+  const clampSeconds = (s) => Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, s));
+
+  // Presets only show while idle, so this never touches a timer that's going.
+  const pick = (seconds, name = "") => {
+    current = { seconds: clampSeconds(seconds), name: name.trim() };
+    reset();
     renderPresets();
-    renderOptions();
+    renderName();
   };
 
   const presetsEl = $("#presets");
@@ -1092,12 +1193,104 @@
     const b = document.createElement("button");
     b.dataset.seconds = m * 60;
     b.innerHTML = `${m}<small data-i18n="min"></small>`;
-    b.addEventListener("click", () => setSeconds(m * 60));
+    b.addEventListener("click", () => pick(m * 60));
     presetsEl.append(b);
   }
+  const customBtn = document.createElement("button");
+  customBtn.id = "custom-btn";
+  customBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg><small data-i18n="custom"></small>';
+  customBtn.addEventListener("click", () => openCustom());
+  presetsEl.append(customBtn);
+
+  const isQuick = () => !current.name && QUICK.includes(current.seconds / 60);
   const renderPresets = () => {
-    presetsEl.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.seconds === settings.seconds));
+    presetsEl.querySelectorAll("[data-seconds]").forEach((b) => b.setAttribute("aria-pressed", !current.name && +b.dataset.seconds === current.seconds));
+    customBtn.setAttribute("aria-pressed", !isQuick());
   };
+
+  const renderName = () => {
+    $("#label").textContent = current.name;
+    $("#done-name").textContent = current.name;
+    document.body.classList.toggle("named", !!current.name);
+    renderTitle();
+  };
+
+  // Minutes and seconds steppers (with typing) inside `root`; get/set work in seconds.
+  const timeEditor = (root, get, set) => {
+    const minIn = root.querySelector("input.min");
+    const secIn = root.querySelector("input.sec");
+    const step = (d) => root.querySelector(`[data-step="${d}"]`);
+    const render = () => {
+      const v = get(), m = Math.floor(v / 60), s = v % 60;
+      minIn.value = m;
+      secIn.value = String(s).padStart(2, "0");
+      step(-60).disabled = v - 60 < MIN_SECONDS;
+      step(60).disabled = v + 60 > MAX_SECONDS;
+      step(-5).disabled = s < 5 || v - 5 < MIN_SECONDS;
+      step(5).disabled = s + 5 > 59 || v + 5 > MAX_SECONDS;
+    };
+    root.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => {
+      set(clampSeconds(get() + +b.dataset.step));
+      render();
+    }));
+    const typed = () => {
+      const m = Math.min(99, parseInt(minIn.value, 10) || 0);
+      const s = Math.min(59, parseInt(secIn.value, 10) || 0);
+      set(clampSeconds(m * 60 + s));
+      render();
+    };
+    [minIn, secIn].forEach((el) => {
+      el.addEventListener("change", typed);
+      el.addEventListener("focus", () => el.select());
+    });
+    return render;
+  };
+
+  // The defaults in settings. While idle they're applied right away, so you see them.
+  const defaultsEl = $("#defaults");
+  const useDefaults = () => {
+    if (state === "idle") pick(settings.seconds, settings.name);
+  };
+  const renderDefaults = timeEditor(defaultsEl, () => settings.seconds, (v) => {
+    settings.seconds = v;
+    save();
+    useDefaults();
+  });
+  $("#default-name").addEventListener("input", (e) => {
+    settings.name = e.target.value.trim();
+    save();
+    useDefaults();
+  });
+
+  // ---------- Custom time ----------
+
+  const customEl = $("#custom");
+  const customForm = customEl.querySelector("form");
+  let draft = 0;
+  const renderDraft = timeEditor(customForm, () => draft, (v) => (draft = v));
+
+  const openCustom = () => {
+    // Start from what's set up if it's already custom, else from the defaults.
+    const from = isQuick() ? settings : current;
+    draft = from.seconds;
+    $("#custom-name").value = from.name;
+    renderDraft();
+    customEl.classList.add("open");
+    customForm.querySelector("input.min").focus();
+  };
+  const closeCustom = () => {
+    customEl.classList.remove("open");
+    customBtn.focus({ preventScroll: true });
+  };
+  customForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    // Enter in a number field submits before its change event; read it first.
+    document.activeElement?.dispatchEvent?.(new Event("change"));
+    pick(draft, $("#custom-name").value);
+    closeCustom();
+  });
+  $("#custom-no").addEventListener("click", closeCustom);
+  customEl.addEventListener("click", (e) => { if (e.target === customEl) closeCustom(); });
 
   const check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   const palette = $(".palette");
@@ -1139,14 +1332,9 @@
   };
 
   const renderOptions = () => {
-    const m = Math.floor(settings.seconds / 60), s = settings.seconds % 60;
-    $("#min").textContent = m;
-    $("#sec").textContent = String(s).padStart(2, "0");
-    $("#min-down").disabled = m === 0;
-    $("#min-up").disabled = m >= 99;
-    $("#sec-down").disabled = s === 0 || settings.seconds - 5 < MIN_SECONDS;
-    $("#sec-up").disabled = s >= 55;
-    $("#sound").checked = settings.sound;
+    renderDefaults();
+    if (document.activeElement !== $("#default-name")) $("#default-name").value = settings.name;
+    $("#sound").setAttribute("aria-pressed", settings.sound);
     $("#show-time").checked = settings.showTime;
     timeEl.classList.toggle("hide", !settings.showTime);
     // Segmented thumbs measure their buttons, so they need the sheet laid out.
@@ -1155,7 +1343,7 @@
 
   const renderTitle = () => {
     document.title = state === "running" || state === "paused"
-      ? `${fmt(shownSecond ?? 0)} · ${t("appName")}`
+      ? `${fmt(shownSecond ?? 0)} · ${current.name || t("appName")}`
       : "Nedtelling · Countdown";
   };
 
@@ -1163,6 +1351,7 @@
     applyI18n();
     setState(state);
     renderPresets();
+    renderName();
     renderColor();
     renderOptions();
     renderInstallHint();
@@ -1182,14 +1371,10 @@
   $("#close").addEventListener("click", closeSettings);
   scrim.addEventListener("click", (e) => { if (e.target === scrim) closeSettings(); });
 
-  $("#min-down").addEventListener("click", () => setSeconds(settings.seconds - 60));
-  $("#min-up").addEventListener("click", () => setSeconds(settings.seconds + 60));
-  $("#sec-down").addEventListener("click", () => setSeconds(settings.seconds - 5));
-  $("#sec-up").addEventListener("click", () => setSeconds(settings.seconds + 5));
-
-  $("#sound").addEventListener("change", (e) => {
-    settings.sound = e.target.checked;
+  $("#sound").addEventListener("click", () => {
+    settings.sound = !settings.sound;
     save();
+    renderOptions();
     // A little preview, which also unlocks audio from this tap.
     if (settings.sound) {
       unlockAudio();
@@ -1258,6 +1443,7 @@
     if (!ok) return;
     settings = defaults();
     save();
+    current = { seconds: settings.seconds, name: settings.name };
     reset();
     renderAll();
   });
@@ -1266,7 +1452,6 @@
   addEventListener("storage", (e) => {
     if (e.key !== STORAGE_KEY) return;
     settings = load();
-    if (state === "idle") reset();
     renderAll();
   });
 

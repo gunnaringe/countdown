@@ -23,10 +23,18 @@ of [color](https://github.com/gunnaringe/color) and styled the same way.
   only draws — the ring's `stroke-dasharray`/`-dashoffset` are set from JS, not
   a CSS animation, because the reduced-motion rule would make a CSS drain
   instant. Finishing has its own `setTimeout`, since rAF stops in hidden tabs.
-- **Sound:** the `AudioContext` is created/resumed in the tap or key press that
-  starts the timer (`unlockAudio`); created later, iOS silently blocks it.
+- **Sound:** toggled by the speaker button in `#controls` (not in settings).
+  The `AudioContext` is created/resumed in the tap or key press that starts the
+  timer (`unlockAudio`); created later, iOS silently blocks it.
+- **Current vs default time:** `current` (`{ seconds, name }`, in memory) is
+  the timer that's set up — a quick pick, a custom one, or the defaults. It's
+  what `reset()` and ↺ reuse. `settings.seconds`/`settings.name` are only the
+  defaults: used at boot, and applied to `current` right away while idle.
+  Presets and custom only show while idle. The name is user text — only ever
+  `textContent`.
 - **i18n:** all UI strings go in the `I18N` object (`no` and `en`) and are wired
-  via `data-i18n` / `data-i18n-html` / `data-i18n-title`.
+  via `data-i18n` / `data-i18n-html` / `data-i18n-title` /
+  `data-i18n-placeholder`.
 - **Settings** persist in `localStorage` under `countdown-settings-v1`. `load()`
   merges stored settings over `defaults()`, so adding a new setting just needs a
   default; bump the key only for incompatible changes.
@@ -37,4 +45,5 @@ of [color](https://github.com/gunnaringe/color) and styled the same way.
 - **Testing:** serve `public/` with `python3 -m http.server` and drive it in
   headless Chromium via Playwright: run a short timer to done, check space
   pauses (time holds), tap resumes, `r`/↺ resets, preset taps don't start it,
-  and settings survive a reload.
+  a custom time (typing `r`/space in its name field mustn't reset or start)
+  survives ↺, and settings survive a reload.
