@@ -21,6 +21,8 @@ left. When time is up, the screen bursts into color and plays a little chime.
 2. Pick a time: tap one of the quick picks (1, 2, 3, 5, 10, 15 minutes), or
    ✏️ for any minutes and seconds, with an optional name shown above the ring
    ("Brush teeth"). Change, add or remove the quick picks in settings (⚙).
+   ✏️ → **Date & time** counts down to a moment instead (a birthday, dinner,
+   the holidays) — it follows the clock, and keeps counting (negative) after.
 3. Press **space**, **Enter** or tap anywhere to start. Tap again to pause.
 4. **↺**, **R** or **Esc** starts over.
 

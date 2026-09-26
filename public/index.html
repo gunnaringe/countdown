@@ -155,13 +155,17 @@
     display: grid;
     place-items: center;
     font-weight: 600;
-    font-size: calc(var(--size) * 0.2);
+    /* Shrunk from JS for long times like "12d 04:12:05". */
+    font-size: calc(var(--size) * var(--fs, 0.2));
+    white-space: nowrap;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.01em;
     color: rgba(255, 255, 255, 0.92);
     transition: opacity 0.3s;
   }
   #time.hide { opacity: 0; }
+  /* Past a date & time target: counting up, in the ring's color. */
+  #time.over { color: var(--c); }
   body[data-state="paused"] #time { animation: blink 1.6s ease-in-out infinite; }
   @keyframes blink { 50% { opacity: 0.3; } }
 
@@ -610,6 +614,10 @@
   .modal .actions { display: flex; gap: 0.6rem; }
   .modal .actions button { flex: 1; padding: 0.8rem 1rem; }
   #custom .badge { color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); }
+  #custom-mode { margin-top: 1rem; }
+  #custom-mode[hidden], #custom .row[hidden] { display: none; }
+  #custom .when label { flex: none; }
+  #custom .when input { max-width: none; padding-inline: 0.8rem; font-size: 0.95rem; color-scheme: dark; }
   #custom .rows { margin: 1rem 0 1.5rem; padding: 0.35rem 0.25rem 0.35rem 1.1rem; border-radius: 1.75rem; background: rgba(255, 255, 255, 0.05); text-align: left; }
   .pill.danger { background: #ff5d8f; color: #fff; }
 
@@ -808,7 +816,7 @@
   <p id="hint"></p>
 </div>
 
-<div id="done"><div><span data-i18n="done"></span><small id="done-name"></small></div></div>
+<div id="done"><div><span data-i18n="done"></span><small id="done-name"></small><small id="done-count"></small></div></div>
 
 <div id="controls">
   <button class="fab" id="restart" data-i18n-title="restart" hidden>
@@ -895,8 +903,13 @@
   <form class="card" role="dialog" aria-modal="true" aria-labelledby="custom-title">
     <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/></svg></div>
     <h4 id="custom-title"></h4>
+    <div class="segmented" id="custom-mode">
+      <span class="thumb"></span>
+      <button type="button" data-value="duration" data-i18n="modeDuration"></button>
+      <button type="button" data-value="target" data-i18n="modeTarget"></button>
+    </div>
     <div class="rows">
-      <div class="row">
+      <div class="row dur">
         <span class="text" data-i18n="minutes"></span>
         <div class="stepper">
           <button type="button" class="round" data-step="-60" aria-label="−"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
@@ -904,13 +917,17 @@
           <button type="button" class="round" data-step="60" aria-label="+"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
         </div>
       </div>
-      <div class="row">
+      <div class="row dur">
         <span class="text" data-i18n="seconds"></span>
         <div class="stepper">
           <button type="button" class="round" data-step="-5" aria-label="−"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
           <input class="sec" inputmode="numeric" maxlength="2" autocomplete="off" data-i18n-title="seconds">
           <button type="button" class="round" data-step="5" aria-label="+"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
         </div>
+      </div>
+      <div class="row when">
+        <label class="text" for="custom-when" data-i18n="when"></label>
+        <input class="text-input" id="custom-when" type="datetime-local">
       </div>
       <div class="row">
         <label class="text" for="custom-name" data-i18n="name"></label>
@@ -952,6 +969,10 @@
       hintStart: "Trykk <kbd>mellomrom</kbd> eller på skjermen for å starte",
       hintPaused: "Pause – trykk for å fortsette",
       hintDone: "Trykk for å starte på nytt",
+      hintShow: "Trykk <kbd>mellomrom</kbd> eller på skjermen for å vise stort",
+      modeDuration: "Varighet",
+      modeTarget: "Tidspunkt",
+      when: "Når",
       done: "Ferdig!",
       min: "min",
       restart: "Start på nytt",
@@ -999,6 +1020,10 @@
       hintStart: "Press <kbd>space</kbd> or tap the screen to start",
       hintPaused: "Paused – tap to continue",
       hintDone: "Tap to start over",
+      hintShow: "Press <kbd>space</kbd> or tap the screen to show it big",
+      modeDuration: "Duration",
+      modeTarget: "Date & time",
+      when: "When",
       done: "Time's up!",
       min: "min",
       restart: "Start over",
@@ -1060,6 +1085,10 @@
     // The last picked time, so a reload keeps it.
     seconds: 5 * 60,
     name: "",
+    // A date & time to count down to (ms), instead of `seconds`; `from` is when
+    // it was picked, where the ring starts.
+    target: null,
+    from: null,
     quick: QUICK.map((q) => ({ ...q })),
     hex: PRESETS.yellow,
     theme: "default",
@@ -1089,6 +1118,8 @@
   //                              optional `_name`. Names are percent-encoded,
   //                              with `+` for spaces. `q=` means none.
   //   t=450_Lekser               the picked time, same token format
+  //   d=1790000000               a date & time target instead, Unix seconds;
+  //                              its name goes in `t`
   //   c=f3a                      ring color, 3/6-digit hex
   //   o=s | o=n | o=             options, only if not both on:
   //                              s = sound, n = show the numbers
@@ -1133,6 +1164,7 @@
     const quick = st.quick.map(encPick).join("~");
     if (quick !== d.quick.map(encPick).join("~")) parts.push(`q=${quick}`);
     if (st.seconds !== d.seconds || st.name) parts.push(`t=${encPick(st)}`);
+    if (st.target) parts.push(`d=${Math.round(st.target / 1000)}`);
     if (st.hex !== d.hex) parts.push(`c=${shortHex(st.hex)}`);
     if (!(st.sound && st.showTime)) parts.push(`o=${st.sound ? "s" : ""}${st.showTime ? "n" : ""}`);
     parts.push(`l=${st.lang === "auto" ? browserLang() : st.lang}`);
@@ -1148,6 +1180,9 @@
       const k = part.slice(0, i), v = part.slice(i + 1);
       if (k === "q") {
         st.quick = v.split("~").map(decPick).filter(Boolean).slice(0, MAX_QUICK).sort((a, b) => a.seconds - b.seconds);
+      } else if (k === "d" && parseInt(v, 10) > 0) {
+        st.target = parseInt(v, 10) * 1000;
+        st.from = Date.now();
       } else if (k === "t") {
         const p = decPick(v);
         if (p) Object.assign(st, p);
@@ -1252,8 +1287,14 @@
   // throttled background tab can't make the timer drift. requestAnimationFrame
   // only draws; finishing has its own timeout, which runs in the background too.
 
-  // The timer that's set up now: a quick pick or a custom one.
-  let current = { seconds: settings.seconds, name: settings.name };
+  // A date & time target follows the wall clock instead: it can't be paused,
+  // is live while idle too, celebrates once at zero and then keeps counting,
+  // negative. `celebrated` says whether zero has been passed already.
+
+  const fromSettings = () => ({ seconds: settings.seconds, name: settings.name, target: settings.target, from: settings.from });
+  // The timer that's set up now: a quick pick, a custom time, or a target.
+  let current = fromSettings();
+  let celebrated = false;
   let state = "idle";
   let total = current.seconds * 1000;
   let left = total;   // ms left, while idle or paused
@@ -1265,21 +1306,40 @@
   const C = 2 * Math.PI * 86;
 
   const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const p2 = (n) => String(n).padStart(2, "0");
+  const fmtLong = (s) => {
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    if (d) return `${d}d ${p2(h)}:${p2(m)}:${p2(s % 60)}`;
+    return h ? `${h}:${p2(m)}:${p2(s % 60)}` : fmt(s);
+  };
 
-  const remaining = () => (state === "running" ? Math.max(0, endAt - Date.now()) : left);
+  const isTarget = () => !!current.target;
 
+  // Signed for a target: negative once it has passed.
+  const remaining = () => {
+    if (isTarget()) return current.target - Date.now();
+    return state === "running" ? Math.max(0, endAt - Date.now()) : left;
+  };
+
+  let shownText = "";
   const draw = () => {
     const ms = remaining();
-    const p = total ? ms / total : 0;
+    const p = total > 0 ? Math.min(1, Math.max(0, ms / total)) : 0;
     // The colored arc runs from its edge clockwise up to twelve o'clock, and
     // the edge sweeps clockwise like a clock hand eating it up.
     bar.style.strokeDasharray = `${C * p} ${C}`;
     bar.style.strokeDashoffset = `${-C * (1 - p)}`;
     ring.classList.toggle("empty", ms <= 0);
-    const s = Math.ceil(ms / 1000);
+    // Whole seconds, rounded up before zero and down after, so it shows 0:00 once.
+    const s = ms > 0 ? Math.ceil(ms / 1000) : -Math.floor(-ms / 1000);
     if (s !== shownSecond) {
       shownSecond = s;
-      timeEl.textContent = fmt(s);
+      const f = isTarget() ? fmtLong : fmt;
+      shownText = s < 0 ? `-${f(-s)}` : f(s);
+      timeEl.textContent = shownText;
+      timeEl.classList.toggle("over", s < 0);
+      timeEl.style.setProperty("--fs", Math.min(0.2, 1.05 / shownText.length));
+      $("#done-count").textContent = isTarget() ? shownText : "";
       if (state === "running" && s <= 10 && s > 0) {
         ring.classList.remove("beat");
         ring.offsetWidth; // restart the beat
@@ -1291,7 +1351,10 @@
 
   const loop = () => {
     draw();
-    if (state === "running") {
+    if (isTarget()) {
+      if (remaining() <= 0 && !celebrated) finish();
+      frame = requestAnimationFrame(loop);
+    } else if (state === "running") {
       if (remaining() <= 0) finish();
       else frame = requestAnimationFrame(loop);
     }
@@ -1301,13 +1364,21 @@
     state = s;
     document.body.dataset.state = s;
     $("#restart").hidden = s === "idle";
-    hint.innerHTML = t({ idle: "hintStart", running: "hintStart", paused: "hintPaused", done: "hintDone" }[s]);
+    hint.innerHTML = t({ idle: isTarget() ? "hintShow" : "hintStart", running: "hintStart", paused: "hintPaused", done: "hintDone" }[s]);
     renderTitle();
+  };
+
+  // setTimeout fires at once for delays over ~24.8 days, so long waits re-arm.
+  const armTarget = () => {
+    clearTimeout(doneTimer);
+    const ms = remaining();
+    if (ms > 0) doneTimer = setTimeout(() => (remaining() > 0 ? armTarget() : finish()), Math.min(ms + 20, 2 ** 31 - 1));
   };
 
   const start = () => {
     unlockAudio();
     keepAwake();
+    if (isTarget()) return setState("running"); // already live
     endAt = Date.now() + left;
     setState("running");
     clearTimeout(doneTimer);
@@ -1325,15 +1396,19 @@
   };
 
   const finish = () => {
-    if (state !== "running" || remaining() > 0) return;
+    if (remaining() > 0) return;
+    if (isTarget()) {
+      if (celebrated) return;
+      celebrated = true;
+    } else {
+      if (state !== "running") return;
+      cancelAnimationFrame(frame);
+      left = 0;
+    }
     clearTimeout(doneTimer);
-    cancelAnimationFrame(frame);
-    left = 0;
     setState("done");
     draw();
-    paint(doneHex());
-    // The hacker theme colors it in CSS.
-    doneEl.style.color = hacker() ? "" : isLight(settings.hex) ? "rgba(0,0,0,0.78)" : "rgba(255,255,255,0.92)";
+    paintDone();
     doneEl.classList.remove("show");
     doneEl.offsetWidth; // restart the pop animation
     doneEl.classList.add("show");
@@ -1341,14 +1416,30 @@
     chime();
   };
 
+  const paintDone = () => {
+    paint(doneHex());
+    // The hacker theme colors it in CSS.
+    doneEl.style.color = hacker() ? "" : isLight(settings.hex) ? "rgba(0,0,0,0.78)" : "rgba(255,255,255,0.92)";
+  };
+
   const reset = (x, y) => {
     clearTimeout(doneTimer);
     cancelAnimationFrame(frame);
     const wasDone = state === "done";
-    total = left = current.seconds * 1000;
     doneEl.classList.remove("show");
-    setState("idle");
-    draw();
+    shownSecond = null;
+    if (isTarget()) {
+      total = Math.max(0, current.target - current.from);
+      celebrated = remaining() <= 0;
+      setState("idle");
+      armTarget();
+      loop();
+      keepAwake();
+    } else {
+      total = left = current.seconds * 1000;
+      setState("idle");
+      draw();
+    }
     if (wasDone) paint("#000000", x, y);
   };
 
@@ -1374,7 +1465,7 @@
   const advance = (x, y) => {
     if (scrim.classList.contains("open") || customEl.classList.contains("open")) return;
     if (state === "idle" || state === "paused") start();
-    else if (state === "running") pause();
+    else if (state === "running") { if (!isTarget()) pause(); }
     else reset(x, y);
   };
 
@@ -1405,8 +1496,11 @@
   // Coming back to a tab whose time ran out while it was hidden.
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
-    if (state === "running") loop();
-    if (state === "running" || state === "paused") keepAwake();
+    if (state === "running" || isTarget()) {
+      cancelAnimationFrame(frame);
+      loop();
+    }
+    if (state === "running" || state === "paused" || isTarget()) keepAwake();
   });
 
   // ---------- Sound ----------
@@ -1423,6 +1517,9 @@
     audio ??= new AC();
     if (audio.state === "suspended") audio.resume();
   };
+
+  // A saved target after a reload has had no tap yet; any tap will do.
+  document.addEventListener("pointerdown", () => isTarget() && unlockAudio(), { passive: true });
 
   const chime = () => {
     if (!settings.sound || !audio) return;
@@ -1484,10 +1581,11 @@
   const clampSeconds = (s) => Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, s));
 
   // Presets only show while idle, so this never touches a timer that's going.
-  const pick = (seconds, name = "") => {
-    current = { seconds: clampSeconds(seconds), name: name.trim() };
-    settings.seconds = current.seconds;
-    settings.name = current.name;
+  const pick = (seconds, name = "", target = null) => {
+    // Keep where the ring started if only the name changed.
+    const from = target && target === current.target ? current.from : Date.now();
+    current = { seconds: clampSeconds(seconds), name: name.trim(), target, from: target ? from : null };
+    Object.assign(settings, current);
     save();
     reset();
     renderPresets();
@@ -1503,11 +1601,15 @@
     yes: t("use"),
     // Start from what's set up if it's already custom, else a blank-named copy.
     value: isQuick() ? { seconds: current.seconds, name: "" } : current,
-    onSave: (v) => pick(v.seconds, v.name),
+    onSave: (v) => {
+      unlockAudio(); // a tap, so a target can ring later
+      pick(v.seconds, v.name, v.target);
+    },
+    allowTarget: true,
     returnTo: customBtn,
   }));
 
-  const same = (q) => q.seconds === current.seconds && q.name === current.name;
+  const same = (q) => !current.target && q.seconds === current.seconds && q.name === current.name;
   const isQuick = () => settings.quick.some(same);
 
   // Big number plus a small unit (or the name) underneath, for the round buttons.
@@ -1533,10 +1635,16 @@
     customBtn.setAttribute("aria-pressed", !isQuick());
   };
 
+  const targetLabel = () => new Intl.DateTimeFormat(lang() === "no" ? "nb" : "en", {
+    weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+  }).format(current.target);
+
   const renderName = () => {
-    $("#label").textContent = current.name;
-    $("#done-name").textContent = current.name;
-    document.body.classList.toggle("named", !!current.name);
+    // An unnamed target is labelled with its date and time.
+    const label = current.name || (isTarget() ? targetLabel() : "");
+    $("#label").textContent = label;
+    $("#done-name").textContent = label;
+    document.body.classList.toggle("named", !!label);
     renderTitle();
   };
 
@@ -1581,15 +1689,40 @@
   let editing = null;
   const renderDraft = timeEditor(customForm, () => draft, (v) => (draft = v));
 
+  const modeEl = $("#custom-mode");
+  const whenEl = $("#custom-when");
+  let mode = "duration";
+  // datetime-local wants local time as YYYY-MM-DDTHH:MM.
+  const toLocal = (ms) => {
+    const d = new Date(ms);
+    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  };
+  const setMode = (m) => {
+    mode = m;
+    customForm.querySelectorAll(".dur").forEach((r) => (r.hidden = m !== "duration"));
+    customForm.querySelector(".when").hidden = m !== "target";
+    requestAnimationFrame(() => setSegmented(modeEl, m));
+  };
+  modeEl.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (b) setMode(b.dataset.value);
+  });
+
   const openEditor = (opts) => {
     editing = opts;
     draft = opts.value.seconds;
     $("#custom-name").value = opts.value.name;
     $("#custom-title").textContent = opts.title;
     $("#custom-yes").textContent = opts.yes;
+    // Default target: the next whole hour.
+    const nextHour = new Date();
+    nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+    whenEl.value = toLocal(opts.value.target || nextHour.getTime());
+    modeEl.hidden = !opts.allowTarget;
     renderDraft();
     customEl.classList.add("open");
-    customForm.querySelector("input.min").focus();
+    setMode(opts.allowTarget && opts.value.target ? "target" : "duration");
+    (mode === "target" ? whenEl : customForm.querySelector("input.min")).focus();
   };
   const closeCustom = () => {
     customEl.classList.remove("open");
@@ -1600,9 +1733,14 @@
     e.preventDefault();
     // Enter in a number field submits before its change event; read it first.
     document.activeElement?.dispatchEvent?.(new Event("change"));
+    let target = null;
+    if (mode === "target") {
+      target = new Date(whenEl.value).getTime();
+      if (!whenEl.value || Number.isNaN(target)) return whenEl.focus();
+    }
     const { onSave } = editing;
     closeCustom();
-    onSave({ seconds: draft, name: $("#custom-name").value.trim() });
+    onSave({ seconds: draft, name: $("#custom-name").value.trim(), target });
   });
   $("#custom-no").addEventListener("click", closeCustom);
   customEl.addEventListener("click", (e) => { if (e.target === customEl) closeCustom(); });
@@ -1721,8 +1859,8 @@
   };
 
   const renderTitle = () => {
-    document.title = state === "running" || state === "paused"
-      ? `${fmt(shownSecond ?? 0)} · ${current.name || t("appName")}`
+    document.title = state === "running" || state === "paused" || isTarget()
+      ? `${shownText} · ${current.name || t("appName")}`
       : "Nedtelling · Countdown";
   };
 
@@ -1768,7 +1906,7 @@
     settings.theme = b.dataset.value;
     save();
     renderAll();
-    if (state === "done") paint(doneHex());
+    if (state === "done") paintDone();
   });
 
   $("#lang").addEventListener("click", (e) => {
@@ -1898,7 +2036,7 @@
   const apply = (st) => {
     settings = st;
     save();
-    current = { seconds: settings.seconds, name: settings.name };
+    current = fromSettings();
     reset();
     renderAll();
   };
@@ -1970,8 +2108,8 @@
   // ---------- Boot ----------
 
   setState("idle");
+  reset();
   renderAll();
-  draw();
   if (linked) {
     const previous = load();
     save();

@@ -33,6 +33,13 @@ of [color](https://github.com/gunnaringe/color) and styled the same way.
   in settings, sorted by time, max `MAX_QUICK`) plus the custom button. One
   dialog (`openEditor`) edits both custom times and quick picks. Presets only
   show while idle. Names are user text — only ever `textContent`.
+- **Date & time targets:** `current.target` (ms) replaces the duration;
+  `current.from` is where the ring starts. A target follows the wall clock:
+  no pause, live while idle too (rAF runs whenever a target is set),
+  celebrates once at zero (`celebrated`), then counts on negative.
+  `remaining()` is signed for targets. `armTarget()` re-arms the timeout,
+  since `setTimeout` fires at once for delays over ~24.8 days. Test with
+  Playwright's `ctx.clock` rather than waiting.
 - **Share links:** "Share setup" encodes the settings into the URL fragment
   (format documented above `encode()`, same style as color's). A link is
   applied once at load — saved, then stripped with `history.replaceState` —
