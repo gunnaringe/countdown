@@ -62,4 +62,7 @@ deploys via Workers Builds; by hand:
 npx wrangler deploy
 ```
 
-Fredoka is self-hosted under the [SIL Open Font License](public/fonts/OFL.txt).
+## Licence
+
+[Apache 2.0](LICENSE), except the self-hosted Fredoka font in `public/fonts/`, under the
+[SIL Open Font License](public/fonts/OFL.txt).
