@@ -7,6 +7,9 @@
   "assets": {
     "directory": "public"
   },
+  // Branch builds run `wrangler preview`, which needs this block; a static
+  // site needs no Preview-specific settings.
+  "previews": {},
   // Only reachable on the custom domain.
   "workers_dev": false,
   "preview_urls": false,
